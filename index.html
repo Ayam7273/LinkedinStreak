@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkedStreak</title>
+  <meta name="description" content="Your LinkedIn posting accountability partner. Build a 3-month streak posting every Monday and Thursday." />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0077B5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="LinkedStreak" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#0077B5"/><path d="M7 11h3.5v10H7V11zm1.75-1.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM13 11h3.3v1.4h.05c.46-.87 1.58-1.8 3.25-1.8 3.48 0 4.12 2.29 4.12 5.27V21H20.2v-4.5c0-1.07-.02-2.45-1.49-2.45-1.5 0-1.73 1.17-1.73 2.38V21H13.5V11z" fill="white"/></svg>
+          <span>LinkedStreak</span>
+        </div>
+        <div class="header-right">
+          <button class="icon-btn" id="notif-btn" title="Enable notifications" aria-label="Enable notifications">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </button>
+          <button class="icon-btn" id="settings-btn" title="Settings" aria-label="Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="main">
+
+      <!-- Streak Hero -->
+      <section class="streak-hero" id="streak-hero">
+        <div class="streak-ring-wrap">
+          <svg class="streak-ring" width="180" height="180" viewBox="0 0 180 180">
+            <circle class="ring-bg" cx="90" cy="90" r="78" stroke-width="10" fill="none"/>
+            <circle class="ring-fill" id="ring-fill" cx="90" cy="90" r="78" stroke-width="10" fill="none"
+              stroke-dasharray="490" stroke-dashoffset="490"
+              stroke-linecap="round" transform="rotate(-90 90 90)"/>
+          </svg>
+          <div class="streak-center">
+            <div class="streak-flame" id="streak-flame">🔥</div>
+            <div class="streak-number" id="streak-number">0</div>
+            <div class="streak-label">week streak</div>
+          </div>
+        </div>
+        <div class="streak-meta">
+          <div class="streak-stat">
+            <span class="stat-value" id="total-posts">0</span>
+            <span class="stat-label">posts done</span>
+          </div>
+          <div class="streak-stat">
+            <span class="stat-value" id="posts-left">26</span>
+            <span class="stat-label">posts left</span>
+          </div>
+          <div class="streak-stat">
+            <span class="stat-value" id="completion-pct">0%</span>
+            <span class="stat-label">complete</span>
+          </div>
+        </div>
+        <div class="milestone-badge" id="milestone-badge" style="display:none"></div>
+      </section>
+
+      <!-- This week card -->
+      <section class="week-card" id="week-card">
+        <div class="week-card-header">
+          <h2 class="section-title">This week</h2>
+          <span class="week-range" id="week-range"></span>
+        </div>
+        <div class="post-days">
+          <div class="post-day" id="day-monday">
+            <div class="day-dot" id="dot-monday"></div>
+            <div class="day-info">
+              <div class="day-name">Monday</div>
+              <div class="day-date" id="date-monday"></div>
+            </div>
+            <div class="day-actions" id="actions-monday"></div>
+          </div>
+          <div class="post-day" id="day-thursday">
+            <div class="day-dot" id="dot-thursday"></div>
+            <div class="day-info">
+              <div class="day-name">Thursday</div>
+              <div class="day-date" id="date-thursday"></div>
+            </div>
+            <div class="day-actions" id="actions-thursday"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Log post panel (shown when user clicks "I posted") -->
+      <div class="log-panel" id="log-panel" style="display:none">
+        <div class="log-panel-inner">
+          <h3>Log your post</h3>
+          <p>Paste the URL of your LinkedIn post below — this proves you posted and saves your streak!</p>
+          <input type="url" id="post-url-input" placeholder="https://www.linkedin.com/posts/..." class="url-input" />
+          <div class="log-error" id="log-error" style="display:none"></div>
+          <div class="log-actions">
+            <button class="btn btn-ghost" id="log-cancel">Cancel</button>
+            <button class="btn btn-primary" id="log-submit">Save post ✓</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress timeline -->
+      <section class="timeline-section">
+        <h2 class="section-title">12-week journey</h2>
+        <div class="timeline" id="timeline"></div>
+        <div class="timeline-legend">
+          <span class="legend-item"><span class="legend-dot done"></span> Posted</span>
+          <span class="legend-item"><span class="legend-dot missed"></span> Missed</span>
+          <span class="legend-item"><span class="legend-dot upcoming"></span> Upcoming</span>
+          <span class="legend-item"><span class="legend-dot future"></span> Future</span>
+        </div>
+      </section>
+
+      <!-- Post history -->
+      <section class="history-section">
+        <h2 class="section-title">Post log</h2>
+        <div id="post-history" class="post-history-empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p>No posts logged yet. Start your streak!</p>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal" style="display:none">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button class="icon-btn" id="settings-close" aria-label="Close settings">✕</button>
+        </div>
+        <div class="modal-body">
+          <label class="field-label">Streak start date</label>
+          <input type="date" id="start-date-input" class="url-input" />
+          <p class="field-hint">Pick the Monday your 3-month journey begins. Defaults to next month's first Monday.</p>
+
+          <label class="field-label" style="margin-top:1rem">Your LinkedIn profile URL</label>
+          <input type="url" id="linkedin-profile-input" placeholder="https://linkedin.com/in/yourname" class="url-input" />
+
+          <label class="field-label" style="margin-top:1rem">Your name</label>
+          <input type="text" id="name-input" placeholder="Abdulbasit" class="url-input" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="reset-btn">Reset all data</button>
+          <button class="btn btn-primary" id="save-settings">Save settings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Celebration overlay -->
+    <div class="celebrate" id="celebrate" style="display:none">
+      <div class="celebrate-inner">
+        <div class="celebrate-emoji" id="celebrate-emoji">🔥</div>
+        <div class="celebrate-msg" id="celebrate-msg">Post logged!</div>
+        <div class="celebrate-sub" id="celebrate-sub">Keep the streak alive</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="src/app.js"></script>
+</body>
+</html>

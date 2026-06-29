@@ -1,0 +1,43 @@
+{
+  "name": "LinkedStreak — LinkedIn Accountability",
+  "short_name": "LinkedStreak",
+  "description": "Your LinkedIn posting accountability partner. Build a 3-month posting streak on Mondays and Thursdays.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0E1A",
+  "theme_color": "#0077B5",
+  "orientation": "portrait-primary",
+  "lang": "en-GB",
+  "categories": ["productivity", "social"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "label": "LinkedStreak home screen"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Log a post",
+      "short_name": "Log post",
+      "description": "Quickly log today's LinkedIn post",
+      "url": "/?action=log",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
