@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- LinkedStreak: three ledger stamps (Fri · Sat · Sun) under a masthead rule. -->
+  <rect width="512" height="512" fill="#F4F0E8"/>
+  <g transform="translate(256 256) scale(1.4) translate(-256 -256)">
+  <rect x="122" y="156" width="268" height="12" fill="#1B1814"/>
+  <rect x="122" y="176" width="268" height="3" fill="#1B1814"/>
+  <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <circle cx="166" cy="276" r="42" fill="#1B1814"/>
+    <circle cx="166" cy="276" r="33" stroke="#F4F0E8" stroke-width="3"/>
+    <path d="M148 277l12 12 23-25" stroke="#F4F0E8" stroke-width="9"/>
+
+    <circle cx="256" cy="276" r="42" fill="#1B1814"/>
+    <circle cx="256" cy="276" r="33" stroke="#F4F0E8" stroke-width="3"/>
+    <path d="M238 277l12 12 23-25" stroke="#F4F0E8" stroke-width="9"/>
+
+    <circle cx="346" cy="276" r="42" fill="#B5471B"/>
+    <circle cx="346" cy="276" r="33" stroke="#F4F0E8" stroke-width="3"/>
+    <path d="M328 277l12 12 23-25" stroke="#F4F0E8" stroke-width="9"/>
+  </g>
+  <rect x="122" y="352" width="268" height="3" fill="#D8D0C2"/>
+  </g>
+</svg>

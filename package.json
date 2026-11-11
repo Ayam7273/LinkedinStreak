@@ -1,0 +1,23 @@
+{
+  "name": "linkedstreak",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal accountability PWA for posting on LinkedIn every Friday, Saturday and Sunday.",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "login": "node scripts/login-link.mjs",
+    "test": "node --test",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "web-push": "3.6.7"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2"
+  }
+}

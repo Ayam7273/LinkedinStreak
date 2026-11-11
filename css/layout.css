@@ -1,0 +1,158 @@
+/* Shell, tab bar, grid, page frames. */
+
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.frame {
+  width: 100%;
+  max-width: calc(var(--measure) + var(--s-5) * 2);
+  margin-inline: auto;
+  padding-inline: var(--s-5);
+}
+
+/* ---- Masthead ---- */
+.masthead {
+  padding-top: calc(env(safe-area-inset-top) + var(--s-5));
+}
+
+.masthead__inner {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: var(--rule-heavy);
+}
+
+.wordmark {
+  font-size: var(--fs-lg);
+  font-weight: var(--weight-bold);
+  font-style: italic;
+  line-height: var(--lh-tight);
+  text-decoration: none;
+}
+
+.masthead__date {
+  text-align: right;
+}
+
+/* ---- Content ---- */
+.content {
+  flex: 1;
+  padding-top: var(--s-6);
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--s-7));
+}
+
+.content--bare {
+  padding-bottom: var(--s-7);
+}
+
+.section {
+  padding-block: var(--s-5);
+  border-top: var(--hairline);
+}
+
+.section:first-of-type {
+  border-top: none;
+  padding-top: var(--zero);
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+
+.view-title {
+  font-size: var(--fs-xl);
+  margin-bottom: var(--s-2);
+}
+
+/* ---- Grids ---- */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.split > * + * {
+  border-left: var(--hairline);
+  padding-left: var(--s-5);
+}
+
+.weekend {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.weekend > * + * {
+  border-left: var(--hairline);
+}
+
+.stack > * + * {
+  margin-top: var(--s-4);
+}
+
+.stack-sm > * + * {
+  margin-top: var(--s-2);
+}
+
+.stack-lg > * + * {
+  margin-top: var(--s-6);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.row--between {
+  justify-content: space-between;
+}
+
+/* ---- Tab bar ---- */
+.tabbar {
+  position: fixed;
+  inset-inline: var(--zero);
+  bottom: var(--zero);
+  z-index: var(--z-tabbar);
+  background: var(--paper);
+  border-top: var(--hairline);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.tabbar__list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  height: var(--tabbar-h);
+  max-width: calc(var(--measure) + var(--s-5) * 2);
+  margin-inline: auto;
+}
+
+/* ---- Banners ---- */
+.banner {
+  position: sticky;
+  top: var(--zero);
+  z-index: var(--z-banner);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--fs-sm);
+  font-style: italic;
+  text-align: center;
+  padding: calc(env(safe-area-inset-top) + var(--s-2)) var(--s-4) var(--s-2);
+}
+
+@media (min-width: 48rem) {
+  .content {
+    padding-top: var(--s-7);
+  }
+}
