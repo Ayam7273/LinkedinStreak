@@ -3,7 +3,7 @@
 A personal ledger for posting on LinkedIn every **Friday, Saturday and Sunday**. Paste (or share) a post link, and the app checks it's a real post, that it's yours, and that it was published on a required day in London time. Then it extends the streak. Miss a day and the streak breaks.
 
 - Vanilla HTML/CSS/JS (ES modules), no build step
-- Vercel Serverless Functions in `/api`
+- Vercel Serverless Functions in `/api` (Node 26)
 - Supabase (Postgres + RLS + magic-link auth)
 - Web Push (VAPID) through `web-push`
 - Typeface: Libre Baskerville only

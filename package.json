@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Personal accountability PWA for posting on LinkedIn every Friday, Saturday and Sunday.",
   "engines": {
-    "node": "20.x"
+    "node": "26.x"
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
