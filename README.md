@@ -33,12 +33,9 @@ Copy `.env.example` to `.env.local` and fill it in (see section 3). `npm run ico
 ### 2.1 Create the database
 
 1. Create a project at <https://supabase.com>.
-2. Open **SQL Editor**, then **New query**. Paste all of [`supabase/schema.sql`](supabase/schema.sql) and click **Run**.
-   - **This drops the old single-user tables** (`settings`, `posts`, `push_subscriptions`, `notification_log`) and creates the new ones.
-3. Run [`supabase/policies.sql`](supabase/policies.sql) the same way. This turns on row-level security for every table.
-4. Both scripts are safe to run again.
+2. The database tables and row-level security policies are already set up in the project. The SQL scripts are not kept in this repo.
 
-What gets created:
+What the database contains:
 
 | Table | Purpose | Signed-in user (anon key + JWT) | Server (service role) |
 |---|---|---|---|
@@ -222,17 +219,16 @@ Invoke-RestMethod "$base/posts" -Headers $a -Method Post -ContentType 'applicati
 ```
 index.html login.html app.html privacy.html terms.html offline.html
 sw.js manifest.webmanifest vercel.json
-assets/       logo.png (restored original), logo.svg, logo-mark.svg
+assets/       logo.png (source artwork), logo.svg, logo-mark.svg
 css/          tokens.css (all values) · base · layout · components · landing
 js/core/      PURE, shared by browser and /api: time, linkedin, schedule, streak, reminders
 js/           app.js (shell) · login.js · router.js · state.js · supabase.js · push.js
 js/views/     today · goals · goal-editor · history · log · onboarding · settings
-js/ui/        logo.js (only place the logo is rendered) · icons · sheet · toast · dom
+js/ui/        logo.js (only place the logo is rendered) · nav.js (landing navbar) · icons · sheet · toast · dom
 api/          config · goals · verify-post · push/{subscribe,test} · cron/reminders · account/{export,delete}
 api/_lib/     supabase-admin · auth (JWT check) · rate-limit · push
-supabase/     schema.sql · policies.sql
 tests/        node --test suites for js/core
-scripts/      dev server · login-link · make-icons
+scripts/      dev server · login-link · make-icons · import-logo
 ```
 
 ## Rules, in one place
