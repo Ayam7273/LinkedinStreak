@@ -105,7 +105,8 @@ export default async function handler(req, res) {
           const r = await sendToUser(goal.user_id, { title: n.title, body: n.body, tag: n.tag, url: n.url }, userSubs);
           report.sent += r.sent;
         }
-      } catch {
+      } catch (err) {
+        console.error('cron/reminders goal failed:', goal?.id, err?.message || err);
         report.errors += 1;
       }
     }

@@ -30,6 +30,12 @@ export default async function handler(req, res) {
     }
     return send(res, 200, { ok: true, ...result });
   } catch (err) {
-    return send(res, 500, { ok: false, code: 'SERVER', message: err?.message?.includes('VAPID') ? 'VAPID keys are not set on the server.' : 'Could not send the test.' });
+    console.error('push/test failed:', err?.message || err);
+    const vapid = /vapid/i.test(err?.message || '');
+    return send(res, 500, {
+      ok: false,
+      code: vapid ? 'VAPID' : 'SERVER',
+      message: vapid ? 'Push keys on the server are missing or invalid. Check the VAPID_* settings in Vercel.' : 'Could not send the test.',
+    });
   }
 }

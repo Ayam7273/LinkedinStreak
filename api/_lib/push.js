@@ -10,8 +10,16 @@ function configure() {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
     throw new Error('VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set');
   }
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  webpush.setVapidDetails(vapidSubject(VAPID_SUBJECT), VAPID_PUBLIC_KEY.trim(), VAPID_PRIVATE_KEY.trim());
   configured = true;
+}
+
+/** web-push needs "mailto:you@example.com" or an https URL. Accept a bare email too. */
+export function vapidSubject(raw) {
+  const s = String(raw).trim();
+  if (/^(mailto:|https:\/\/)/i.test(s)) return s;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return `mailto:${s}`;
+  return s; // let web-push report anything else
 }
 
 /**
