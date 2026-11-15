@@ -1,38 +1,37 @@
 {
-  "id": "/",
-  "name": "LinkedStreak",
-  "short_name": "Streak",
-  "description": "A ledger for posting on LinkedIn every Friday, Saturday and Sunday.",
+  "id": "/app.html",
+  "name": "LinkedInStreak",
+  "short_name": "LinkedInStreak",
+  "description": "Build a LinkedIn posting habit that sticks. Set your schedule, log posts, keep your streak.",
   "lang": "en-GB",
   "dir": "ltr",
-  "start_url": "/#/today",
+  "start_url": "/app.html#/today",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F4F0E8",
-  "theme_color": "#F4F0E8",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0A66C2",
   "categories": ["productivity"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "share_target": {
-    "action": "/share",
+    "action": "/app.html",
     "method": "GET",
-    "params": { "title": "title", "text": "text", "url": "url" }
+    "params": { "url": "url", "text": "text" }
   },
   "shortcuts": [
     {
       "name": "Log a post",
       "short_name": "Log",
-      "url": "/#/log",
+      "url": "/app.html#/log",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Ledger",
-      "url": "/#/ledger",
+      "name": "History",
+      "url": "/app.html#/history",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]

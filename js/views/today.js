@@ -1,133 +1,225 @@
-// Today: the streak numeral, secondary stats, this weekend, one action.
-import { getState, subscribe, derived, consumeStamp } from '../state.js';
-import { londonDate, weekdayName, formatDay, formatTime, daysBetween, nextRequiredDay, isRequiredDay, formatWeekendRange } from '../time.js';
-import { stateMark } from '../ui/icons.js';
-import { esc, reducedMotion } from '../ui/dom.js';
+// Today: streak hero, this period, primary action, active goal.
+import { getState, activeGoal, summaryFor, versionsOf, pausesOf, versionNow, weekStart, goalStatus, goalAction, set } from '../state.js';
+import { weekStrip, currentUnit, graceLabel } from '../core/streak.js';
+import { weekdayName, formatDay, daysBetween } from '../core/time.js';
+import { icon } from '../ui/icons.js';
+import { esc, plural, describeGoal, STATE_TEXT, STATE_ICON, reducedMotion, busy } from '../ui/dom.js';
+import { toast } from '../ui/toast.js';
+import { openGoalEditor } from './goal-editor.js';
 
-const STATUS = {
-  complete: (d) => `Logged ${formatTime(d.post.logged_at || d.post.published_at)}`,
-  open: () => 'Due today',
-  grace: () => 'Log by 12:00',
-  missed: () => 'Missed',
-  upcoming: () => 'Upcoming',
-  'before-start': () => 'Before start',
-};
-
-export function dayCell(d, { compact = false, interactive = false } = {}) {
-  const name = weekdayName(d.date, true);
-  const tag = interactive && d.state === 'complete' ? 'button' : 'div';
-  const attrs = tag === 'button' ? ` type="button" data-post="${esc(d.post.id)}"` : '';
-  const status = STATUS[d.state](d);
-  return `<${tag} class="day day--${d.state}${compact ? ' day--compact' : ''}" data-day="${d.date}"${attrs}>
-    <span class="day__name" aria-hidden="true">${name}</span>
-    <span class="day__date" aria-hidden="true">${formatDay(d.date, { weekday: false })}</span>
-    <span class="day__mark">${stateMark(d.state)}</span>
-    ${compact ? '' : `<span class="day__status" aria-hidden="true">${esc(status)}</span>`}
-    <span class="visually-hidden">${weekdayName(d.date)} ${formatDay(d.date, { weekday: false })}: ${esc(status)}</span>
-  </${tag}>`;
-}
-
-function skeleton() {
-  return `<div class="stack-lg" aria-busy="true" aria-label="Loading">
-    <div><span class="label">Current streak</span><span class="skeleton skeleton--hero"></span></div>
-    <div><span class="skeleton"></span><span class="skeleton skeleton--short"></span></div>
-    <div><span class="skeleton"></span><span class="skeleton"></span><span class="skeleton skeleton--short"></span></div>
-  </div>`;
-}
-
-function action(sum, settings, now) {
-  const today = londonDate(now);
-  const todayDay = sum.days.find((d) => d.date === today);
-  const grace = sum.days.find((d) => d.state === 'grace');
-  const start = settings?.start_date;
-
-  if (start && today < start && !grace) {
-    const n = daysBetween(today, start);
-    return `<p class="quiet-line">Your streak starts ${weekdayName(start)} ${formatDay(start, { weekday: false })} · ${n === 1 ? 'tomorrow' : `${n} days`}</p>`;
-  }
-
-  if (grace && todayDay?.state === 'open') {
-    return `<a class="btn btn--primary" href="#/log">Log a post</a>
-      <p class="field__help">${weekdayName(grace.date)} can still be logged until 12:00.</p>`;
-  }
-  if (grace) {
-    return `<a class="btn btn--primary" href="#/log">Log ${weekdayName(grace.date)}'s post</a>
-      <p class="field__help">Logging for ${weekdayName(grace.date)} closes at 12:00 today.</p>`;
-  }
-  if (todayDay?.state === 'open') {
-    return `<a class="btn btn--primary" href="#/log">Log today's post</a>`;
-  }
-  if (todayDay?.state === 'complete') {
-    const next = nextRequiredDay(today);
-    const when = daysBetween(today, next) === 1 ? 'tomorrow' : weekdayName(next);
-    return `<p class="quiet-line">${weekdayName(today)} is done. See you ${when}.</p>`;
-  }
-  if (!isRequiredDay(today)) {
-    const next = nextRequiredDay(today);
-    const n = daysBetween(today, next);
-    return `<p class="quiet-line">Next post due ${weekdayName(next)} · ${n === 1 ? 'tomorrow' : `${n} days`}</p>`;
-  }
-  return '';
-}
-
-function view(root) {
+export function render(root, { navigate }) {
   const s = getState();
-  if (s.status !== 'ready' || !s.settings) {
-    root.innerHTML = s.status === 'error'
-      ? `<p class="aside">Couldn't load your ledger. ${esc(s.error?.message || '')}</p>`
-      : skeleton();
+  const goal = activeGoal();
+
+  if (!s.goals.length) {
+    root.innerHTML = `
+      <div class="view">
+        <div class="card empty">
+          ${icon('goals')}
+          <h2>Set your first goal</h2>
+          <p>Choose the days you want to post, or a number of posts a week. We'll keep score.</p>
+          <button type="button" class="btn btn--primary btn--lg" data-new>${icon('plus')}Create a goal</button>
+        </div>
+      </div>`;
+    root.querySelector('[data-new]').addEventListener('click', () => openGoalEditor({}));
     return;
   }
 
-  const now = Date.now();
-  const sum = derived(now);
-  const weekend = sum.weekends.find((w) => w.friday === sum.focus);
-  const stamp = consumeStamp();
-  const shownNumber = stamp && !reducedMotion() ? stamp.from : sum.current;
+  if (!goal) {
+    const paused = s.goals.filter((g) => g.status === 'paused');
+    const latest = paused[paused.length - 1];
+    root.innerHTML = `
+      <div class="view">
+        <div class="card empty">
+          ${icon('pause')}
+          <h2>No active goal</h2>
+          <p>${latest ? `“${esc(latest.name)}” is paused. Paused days never break your streak.` : 'Your goals have ended. Start a new one to keep going.'}</p>
+          ${
+            latest && goalStatus(latest) !== 'completed'
+              ? `<button type="button" class="btn btn--primary btn--lg" data-resume="${latest.id}">${icon('play')}Resume “${esc(latest.name)}”</button>`
+              : `<button type="button" class="btn btn--primary btn--lg" data-new>${icon('plus')}New goal</button>`
+          }
+        </div>
+      </div>`;
+    root.querySelector('[data-new]')?.addEventListener('click', () => openGoalEditor({}));
+    root.querySelector('[data-resume]')?.addEventListener('click', async (e) => {
+      const restore = busy(e.currentTarget, 'Resuming…');
+      const r = await goalAction({ action: 'resume', id: e.currentTarget.dataset.resume });
+      if (!r.ok) {
+        restore();
+        toast(r.message || 'Could not resume the goal.');
+      }
+    });
+    return;
+  }
 
-  const needsProfile = !s.settings.profile_slug;
+  const sum = summaryFor(goal);
+  if (!sum) {
+    root.innerHTML = `<div class="view"><span class="skeleton skeleton--card"></span></div>`;
+    return;
+  }
+  const ws = weekStart();
+  const version = versionNow(goal.id);
+  const unitWord = sum.unit === 'weeks' ? 'week' : 'day';
+  const rate = sum.completionRate == null ? null : Math.round(sum.completionRate * 100);
+  const meta = [`Best ${sum.best}`, rate == null ? 'No results yet' : `${rate}% completion`].join(' · ');
+  const scheduled = goalStatus(goal) === 'scheduled';
 
   root.innerHTML = `
-    <h1 class="visually-hidden">Today</h1>
-    <section class="section" aria-labelledby="streak-label">
-      <div class="hero">
+    <div class="view">
+      <section class="card hero-card col-7" aria-labelledby="streak-label">
         <span class="label" id="streak-label">Current streak</span>
-        <span class="hero__num numeral" data-num aria-describedby="streak-caption">${shownNumber}</span>
-        <span class="hero__mark" aria-hidden="true"><span class="hero__rule"></span></span>
-        <p class="hero__caption aside" id="streak-caption">${sum.current === 1 ? 'day' : 'days'} in a row · best ${sum.best}</p>
-      </div>
-    </section>
+        <div class="streak">
+          <span class="streak__num ${sum.current > 0 ? 'is-live' : ''}" data-num>${sum.current}</span>
+          <span class="streak__unit">${sum.current === 1 ? unitWord : `${unitWord}s`}</span>
+          ${icon('flame', { cls: `flame ${sum.current > 0 ? '' : 'is-cold'}` })}
+        </div>
+        <p class="streak__meta">${meta}</p>
+      </section>
 
-    <section class="section split" aria-label="Totals">
-      <div><span class="label">Full weekends</span><span class="stat__value numeral">${sum.fullWeekends}</span></div>
-      <div><span class="label">Total posts</span><span class="stat__value numeral">${sum.totalPosts}</span></div>
-    </section>
+      <section class="card col-5" aria-labelledby="period-title">
+        <div class="card__head">
+          <h2 class="card__title" id="period-title">This week</h2>
+        </div>
+        ${sum.mode === 'weekly' ? weeklyPeriod(sum, ws) : pills(sum, goal, ws)}
+      </section>
 
-    <section class="section" aria-labelledby="weekend-label">
-      <div class="section__head">
-        <h2 class="label" id="weekend-label">This weekend</h2>
-        <span class="aside meta">${formatWeekendRange(sum.focus)}</span>
-      </div>
-      <div class="weekend">${weekend.days.map((d) => dayCell(d)).join('')}</div>
-    </section>
+      <div class="col-7" data-action>${scheduled ? startsSoon(goal) : primaryAction(sum, goal, ws)}</div>
 
-    <section class="section stack">
-      ${needsProfile ? `<p class="note">Add your LinkedIn profile link in <a href="#/settings">Settings</a> so the app can tell your posts from anyone else's.</p>` : ''}
-      ${action(sum, s.settings, now)}
-    </section>`;
+      <section class="card col-5" aria-labelledby="goal-title">
+        <div class="card__head">
+          <span class="label" id="goal-title">Active goal</span>
+          <button type="button" class="link-btn" data-edit>Edit</button>
+        </div>
+        <p class="goal-card__name">${esc(goal.name)}</p>
+        <p class="small muted">${esc(describeGoal(goal, version).line)}</p>
+      </section>
+    </div>`;
 
-  if (stamp && !reducedMotion()) {
-    const mark = root.querySelector(`[data-day="${stamp.day}"] .day__mark`);
-    mark?.classList.add('is-stamping');
-    const num = root.querySelector('[data-num]');
-    setTimeout(() => {
-      num.textContent = String(sum.current);
-      num.classList.add('is-ticking');
-    }, 260);
+  root.querySelector('[data-edit]').addEventListener('click', () => openGoalEditor({ goal }));
+  root.querySelector('[data-log]')?.addEventListener('click', () => navigate('log'));
+
+  // Count the streak up after a successful log.
+  const bump = s.bump;
+  if (bump) {
+    set({ bump: null });
+    const el = root.querySelector('[data-num]');
+    if (el && !reducedMotion()) countUp(el, bump.from, bump.to);
   }
 }
 
-export function mount(root) {
-  view(root);
-  return subscribe(() => view(root));
+function countUp(el, from, to) {
+  el.classList.add('bump');
+  const steps = Math.max(1, Math.abs(to - from));
+  const each = Math.min(120, 600 / steps);
+  let n = from;
+  el.textContent = String(n);
+  const tick = () => {
+    n += to > n ? 1 : -1;
+    el.textContent = String(n);
+    if (n !== to) setTimeout(tick, each);
+  };
+  setTimeout(tick, each);
+}
+
+function pills(sum, goal, ws) {
+  const strip = weekStrip(sum, goal, versionsOf(goal.id), pausesOf(goal.id), ws);
+  const items = strip
+    .map((d) => {
+      const state = d.required ? d.state : d.state === 'paused' ? 'paused' : null;
+      const cls = !d.required && state !== 'paused' ? 'pill--off' : `pill--${state}`;
+      const text = !d.required && state !== 'paused' ? 'Rest day' : stateText(d);
+      const ic = d.required || state === 'paused' ? STATE_ICON[state] : null;
+      const label = `${weekdayName(d.date)} ${formatDay(d.date, { weekday: false })}: ${text}`;
+      return `<li class="pill ${cls} ${d.isToday ? 'is-today' : ''}" aria-label="${esc(label)}" ${d.isToday ? 'aria-current="date"' : ''}>
+          <span class="pill__day" aria-hidden="true">${weekdayName(d.date, true)}</span>
+          <span class="pill__date" aria-hidden="true">${Number(d.date.slice(8))}</span>
+          ${ic ? icon(ic) : '<span class="icon icon--sm" aria-hidden="true"></span>'}
+        </li>`;
+    })
+    .join('');
+
+  // Chips for the open and grace days, so state is never colour alone.
+  const chips = strip
+    .filter((d) => d.required && (d.state === 'open' || d.state === 'grace'))
+    .map((d) =>
+      d.state === 'open'
+        ? `<span class="chip chip--blue">${icon('clock')}Due today</span>`
+        : `<span class="chip chip--accent">${icon('clock')}${esc(weekdayName(d.date))}: ${esc(graceLabel(d.unit))}</span>`,
+    )
+    .join('');
+
+  return `<ol class="pills" aria-label="This week">${items}</ol>${chips ? `<div class="row mt-3">${chips}</div>` : ''}`;
+}
+
+function stateText(d) {
+  if (d.state === 'grace') return graceLabel(d.unit);
+  if (d.state === 'open' && !d.isToday) return 'Due';
+  return STATE_TEXT[d.state] || 'Due';
+}
+
+function weeklyPeriod(sum, ws) {
+  const unit = currentUnit(sum, ws);
+  if (!unit) {
+    return `<p class="muted small">This week isn't part of the goal. ${sum.units.length ? '' : 'The goal starts soon.'}</p>`;
+  }
+  const done = Math.min(unit.count, unit.needed);
+  const left = Math.max(0, daysBetween(sum.today, unit.last) + 1);
+  const segs = Array.from({ length: unit.needed }, (_, i) => `<span class="progress__seg ${i < done ? 'is-done' : ''}"></span>`).join('');
+  const stateLine =
+    unit.state === 'complete'
+      ? `<span class="chip chip--complete">${icon('check')}Target reached</span>`
+      : unit.state === 'paused'
+        ? `<span class="chip chip--paused">${icon('pause')}Paused</span>`
+        : `<span class="chip chip--blue">${icon('clock')}${plural(left, 'day')} left</span>`;
+  return `
+    <div class="row row--between mb-3">
+      <span class="num">${done} of ${unit.needed} this week</span>
+      ${stateLine}
+    </div>
+    <div class="progress" role="img" aria-label="${done} of ${unit.needed} posts logged this week">${segs}</div>`;
+}
+
+function logButton(label) {
+  return `<button type="button" class="btn btn--primary btn--lg btn--block" data-log>${icon('plus')}${esc(label)}</button>`;
+}
+
+function calm(title, sub) {
+  return `<div class="card card--calm">
+    <div class="row">${icon('check', { size: 'lg' })}<div><p class="card__title">${esc(title)}</p>${sub ? `<p class="small muted">${esc(sub)}</p>` : ''}</div></div>
+  </div>`;
+}
+
+function nextDue(sum) {
+  const next = sum.units.find((u) => u.state === 'upcoming');
+  if (!next) return null;
+  const days = daysBetween(sum.today, next.first);
+  return `Next post due ${weekdayName(next.first)} · ${days === 1 ? 'tomorrow' : `in ${days} days`}`;
+}
+
+function primaryAction(sum, goal, ws) {
+  if (sum.ended) return calm('This goal has finished', 'Have a look at your history, or start a new goal.');
+
+  if (sum.mode === 'weekly') {
+    const unit = currentUnit(sum, ws);
+    const grace = sum.units.find((u) => u.state === 'grace');
+    if (grace) return `${logButton("Log last week's post")}<p class="small muted mt-2">${esc(graceLabel(grace))}</p>`;
+    if (!unit || unit.state === 'paused') return calm('Nothing due this week', nextDue(sum));
+    if (unit.state === 'complete') return calm("This week's target is done", 'Extra posts still show up in your history.') + `<div class="mt-3">${logButton('Log another post')}</div>`;
+    return logButton("Log today's post");
+  }
+
+  const today = sum.units.find((u) => u.key === sum.today);
+  const grace = sum.units.find((u) => u.state === 'grace');
+  if (grace) {
+    return `${logButton(`Log ${weekdayName(grace.first)}'s post`)}<p class="small muted mt-2">${esc(graceLabel(grace))}</p>`;
+  }
+  if (today?.state === 'open') return logButton("Log today's post");
+  if (today?.state === 'complete') return calm("Today's post is logged", nextDue(sum) || 'Nice work. See you next time.');
+  if (today?.state === 'paused') return calm('Today is paused', nextDue(sum));
+  return calm('No post due today', nextDue(sum) || 'Enjoy the day off.');
+}
+
+function startsSoon(goal) {
+  return calm(`Starts ${formatDay(goal.start_date)}`, 'You can log posts from the first day of the goal.');
 }

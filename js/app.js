@@ -1,263 +1,275 @@
-// Boot, router, view mounting.
-import { applyTheme } from './theme.js';
-import { getSession, onAuthChange } from './supabase.js';
-import { load, set, getState, clearLegacy, clearCache } from './state.js';
-import { resyncPush } from './push.js';
-import { extractUrl } from './linkedin.js';
-import { londonDate, weekdayName, formatDay } from './time.js';
-import { toast } from './ui/toast.js';
+// App shell entry (/app.html): auth guard, shell, routing, offline banner, service worker.
+import { supabase, requireSession, authHashInfo, stashSharedLink, takeSharedLink, onAuthChange, signOut } from './supabase.js';
+import { getState, subscribe, set, load, refresh, activeGoal } from './state.js';
+import { TABS, current, navigate, onRoute, sharedParams, clearSharedParams } from './router.js';
+import { extractUrl } from './core/linkedin.js';
 import { icon } from './ui/icons.js';
-import { esc } from './ui/dom.js';
+import { brand, logo } from './ui/logo.js';
+import { esc, initial } from './ui/dom.js';
+import { toast } from './ui/toast.js';
 import { closeSheet, isSheetOpen } from './ui/sheet.js';
-import * as Today from './views/today.js';
-import * as Ledger from './views/ledger.js';
-import * as Settings from './views/settings.js';
-import * as SignIn from './views/signin.js';
-import { openLogSheet } from './views/log.js';
+import { resyncPush } from './push.js';
+import * as today from './views/today.js';
+import * as goals from './views/goals.js';
+import * as history from './views/history.js';
+import * as settings from './views/settings.js';
+import * as onboarding from './views/onboarding.js';
+import { openLog } from './views/log.js';
 
-applyTheme();
-clearLegacy();
-
-const ROUTES = { today: Today, ledger: Ledger, settings: Settings };
-const TABS = [
-  ['today', 'Today'],
-  ['ledger', 'Ledger'],
-  ['settings', 'Settings'],
-];
-
+const VIEWS = { today, goals, history, settings, onboarding };
+const LIVE = new Set(['today', 'goals', 'history']); // re-render on data changes
 const app = document.getElementById('app');
-let current = { name: null, unmount: null };
-let sharePrefill = '';
-let booted = false;
-let logSheet = null;
+let main;
+let shown = null;
 
-// ---- Share target: /share?url=...&text=... -> /#/log with the link filled in
-if (location.pathname === '/share') {
-  const q = new URLSearchParams(location.search);
-  sharePrefill = extractUrl(q.get('url') || '') || extractUrl(q.get('text') || '') || extractUrl(q.get('title') || '');
-  history.replaceState(null, '', '/#/log');
-}
+// Capture the install prompt early (Chrome/Edge/Android).
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.__installPrompt = e;
+});
 
-// ---- Shell ------------------------------------------------------------------
-function mastheadDate() {
-  const d = londonDate(Date.now());
-  return `${weekdayName(d)} ${formatDay(d, { weekday: false, year: true })}`;
-}
-
-function shell({ tabs = true } = {}) {
-  app.innerHTML = `
-    <div class="shell">
-      <header class="masthead frame">
-        <div class="masthead__inner">
-          <a class="wordmark" href="#/today">LinkedStreak</a>
-          <span class="label masthead__date" data-date>${esc(mastheadDate())}</span>
-        </div>
-      </header>
-      <main class="content frame${tabs ? '' : ' content--bare'}" id="view" tabindex="-1"></main>
-      ${tabs ? `<nav class="tabbar" aria-label="Main">
-        <ul class="tabbar__list">
-          ${TABS.map(([k, t]) => `<li><a class="tab" href="#/${k}" data-tab="${k}">${icon(k)}<span>${t}</span></a></li>`).join('')}
-        </ul>
-      </nav>` : ''}
-    </div>`;
-}
-
-function setActiveTab(name) {
-  app.querySelectorAll('[data-tab]').forEach((a) => {
-    if (a.dataset.tab === name) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
-  });
-}
-
-// ---- Router -----------------------------------------------------------------
-function parseRoute() {
-  const h = location.hash.replace(/^#\/?/, '');
-  const name = h.split(/[?/]/)[0] || 'today';
-  return name;
-}
-
-function mountView(name) {
-  const view = document.getElementById('view');
-  if (!view) return;
-  if (current.name === name) return;
-  current.unmount?.();
-  current = { name, unmount: ROUTES[name].mount(view) };
-  setActiveTab(name);
-  const titles = { today: 'Today', ledger: 'Ledger', settings: 'Settings' };
-  document.title = name === 'today' ? 'LinkedStreak' : `${titles[name]} · LinkedStreak`;
-}
-
-function route() {
-  if (!getState().user) return;
-  const name = parseRoute();
-
-  if (name === 'log') {
-    if (current.name !== 'today') mountView('today');
-    if (!logSheet) {
-      const prefill = sharePrefill;
-      sharePrefill = '';
-      logSheet = openLogSheet({
-        prefill,
-        onClose: () => {
-          logSheet = null;
-          if (parseRoute() === 'log') location.hash = '#/today';
-        },
-      });
-    }
-    return;
-  }
-
-  if (logSheet) {
-    const s = logSheet;
-    logSheet = null;
-    s.close({ silent: true });
-  } else if (isSheetOpen()) {
-    closeSheet();
-  }
-
-  if (!ROUTES[name]) {
-    location.replace('#/today');
-    return;
-  }
-  const changed = current.name !== name;
-  mountView(name);
-  if (changed) {
-    window.scrollTo(0, 0);
-    if (booted) document.getElementById('view')?.focus({ preventScroll: true });
-  }
-}
-
-window.addEventListener('hashchange', route);
-
-// ---- Auth -------------------------------------------------------------------
-function showSignIn() {
-  current.unmount?.();
-  current = { name: 'signin', unmount: null };
-  shell({ tabs: false });
-  document.title = 'Sign in · LinkedStreak';
-  current.unmount = SignIn.mount(document.getElementById('view'));
-}
-
-function showSetupError(err) {
-  shell({ tabs: false });
-  document.getElementById('view').innerHTML = `
-    <h1 class="view-title">Not set up yet</h1>
-    <p class="aside">${esc(err.message || 'The app could not reach its server.')}</p>
-    <p class="field__help">See the README: Supabase, then environment variables in Vercel.</p>`;
-}
-
-async function enter(session) {
-  const user = session.user;
-  if (getState().user?.id === user.id && current.name && current.name !== 'signin') return;
-  current = { name: null, unmount: null };
-  shell();
-  set({ user });
-  if (!location.hash || /access_token|error_description/.test(location.hash)) {
-    history.replaceState(null, '', sharePrefill ? '/#/log' : '/#/today');
-  }
-  route();
-  booted = true;
-  await load(user);
-  resyncPush();
-}
+boot();
 
 async function boot() {
-  let session;
+  // A shared link arrives as ?url= / ?text=. Keep it through sign-in.
+  const shared = sharedParams();
+  if (shared) stashSharedLink(extractUrl(shared) || shared);
+
+  const hashInfo = authHashInfo();
   try {
-    session = await getSession();
+    await supabase(); // parses #access_token=… if present
   } catch (err) {
-    if (!navigator.onLine) {
-      showSetupError({ message: "You're offline and this device hasn't signed in yet." });
-    } else {
-      showSetupError(err);
-    }
+    return fatal(err.message);
+  }
+  if (hashInfo?.error) {
+    location.replace(`/login.html#error=${encodeURIComponent(hashInfo.error)}`);
     return;
   }
+  const session = await requireSession();
+  if (!session) return;
+  if (hashInfo || shared) clearSharedParams('today');
 
-  if (session) await enter(session);
-  else {
-    showSignIn();
-    // A failed magic link comes back as #error=…&error_description=…
-    const params = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
-    const desc = params.get('error_description');
-    if (desc) {
-      history.replaceState(null, '', '/');
-      toast(/expired|invalid/i.test(desc) ? 'That sign-in link has expired or was already used. Send a new one.' : desc, { duration: 8000 });
-    }
+  onAuthChange((event) => {
+    if (event === 'SIGNED_OUT') location.replace('/login.html');
+  });
+
+  await load();
+  const s = getState();
+  if (s.status === 'error') return fatal(s.error);
+
+  shell();
+  subscribe(onStore);
+  onRoute(route);
+  wireOnline();
+  registerSW();
+  resyncPush();
+
+  const pending = takeSharedLink();
+  if (!s.profile?.onboarded_at) {
+    if (pending) stashSharedLink(pending); // keep it until onboarding is done
+    navigate('onboarding', { replace: true });
+  } else if (pending) {
+    navigate('today', { replace: true });
+    openLog({ prefill: pending, onClose: () => navigate('today', { replace: true }) });
+  } else {
+    route(current());
   }
 
-  onAuthChange((s) => {
-    if (s) enter(s);
-    else {
-      clearCache();
-      set({ user: null, settings: null, posts: [], status: 'idle' });
-      showSignIn();
-    }
+  // Keep data fresh when the app comes back to the foreground.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !isSheetOpen()) refresh();
   });
 }
 
-// ---- Ticking clock: re-derive states every minute, refresh on focus ----------
-setInterval(() => {
-  const d = app.querySelector('[data-date]');
-  if (d) d.textContent = mastheadDate();
-  if (getState().status === 'ready') set({});
-}, 60 * 1000);
-
-document.addEventListener('visibilitychange', () => {
-  const { user } = getState();
-  if (document.visibilityState === 'visible' && user) {
-    load(user);
-    resyncPush();
-  }
-});
-
-// ---- Offline banner ---------------------------------------------------------
-const banner = document.getElementById('offline');
-function onNetwork() {
-  const online = navigator.onLine;
-  if (banner) banner.hidden = online;
-  set({ online });
+function fatal(message) {
+  app.innerHTML = `
+    <div class="center-page">
+      <div class="card auth-card stack">
+        ${logo({ size: 'lg' })}
+        <h1>Something went wrong</h1>
+        <p class="muted">${esc(message || 'Could not load LinkedInStreak.')}</p>
+        <div class="row">
+          <button type="button" class="btn btn--primary" data-retry>Try again</button>
+          <button type="button" class="btn" data-out>Sign out</button>
+        </div>
+      </div>
+    </div>`;
+  app.querySelector('[data-retry]').addEventListener('click', () => location.reload());
+  app.querySelector('[data-out]').addEventListener('click', async () => {
+    await signOut().catch(() => null);
+    location.replace('/login.html');
+  });
 }
-window.addEventListener('online', () => {
-  onNetwork();
-  const { user } = getState();
-  if (user) load(user);
-});
-window.addEventListener('offline', onNetwork);
-onNetwork();
 
-// ---- Service worker + update flow -------------------------------------------
-if ('serviceWorker' in navigator) {
+function navLinks(cls, r) {
+  return TABS.map(
+    (t) => `<a class="${cls}" href="#/${t.route}" ${t.route === r ? 'aria-current="page"' : ''} data-route="${t.route}">${icon(t.icon, { size: cls === 'tab' ? 'lg' : '' })}<span>${t.label}</span></a>`,
+  ).join('');
+}
+
+function shell() {
+  const s = getState();
+  app.innerHTML = `
+    <div class="banner" data-offline hidden role="status">${icon('wifiOff', { size: 'sm', cls: 'inline' })} You're offline. Changes will need a connection.</div>
+    <div class="app">
+      <header class="appbar">
+        ${brand()}
+        <div class="menu-wrap">
+          <button type="button" class="avatar-btn" data-avatar aria-haspopup="menu" aria-expanded="false" aria-label="Account menu">
+            <span class="avatar" aria-hidden="true">${initial(s.profile, s.user)}</span>
+          </button>
+          <div class="menu" role="menu" data-menu hidden>
+            <p class="menu__head">${esc(s.user?.email || '')}</p>
+            <a class="menu__item" role="menuitem" href="#/settings">${icon('settings')}Settings</a>
+            <button type="button" class="menu__item menu__item--danger" role="menuitem" data-signout>${icon('logout')}Sign out</button>
+          </div>
+        </div>
+      </header>
+      <aside class="sidebar" aria-label="Main">
+        ${brand()}
+        <nav class="nav" aria-label="Main" data-side>${navLinks('nav-item', current())}</nav>
+        <div class="sidebar__goal" data-sidegoal></div>
+      </aside>
+      <main class="main" id="main" tabindex="-1"></main>
+      <nav class="tabbar" aria-label="Main">
+        <div class="tabbar__list" data-tabs>${navLinks('tab', current())}</div>
+      </nav>
+    </div>`;
+  main = app.querySelector('#main');
+
+  const btn = app.querySelector('[data-avatar]');
+  const menu = app.querySelector('[data-menu]');
+  const closeMenu = () => {
+    menu.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = menu.hidden;
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    if (open) menu.querySelector('.menu__item')?.focus();
+  });
+  document.addEventListener('click', (e) => {
+    if (!menu.hidden && !e.target.closest('.menu-wrap')) closeMenu();
+  });
+  menu.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeMenu();
+      btn.focus();
+    }
+  });
+  menu.addEventListener('click', (e) => {
+    if (e.target.closest('.menu__item')) closeMenu();
+  });
+  app.querySelector('[data-signout]').addEventListener('click', async () => {
+    await signOut();
+    location.replace('/login.html');
+  });
+  sideGoal();
+}
+
+function sideGoal() {
+  const el = app.querySelector('[data-sidegoal]');
+  if (!el) return;
+  const g = activeGoal();
+  el.innerHTML = g ? `<span class="faint">Active goal</span><strong>${esc(g.name)}</strong>` : '<span class="faint">No active goal</span>';
+}
+
+function markNav(r) {
+  app.querySelectorAll('[data-route]').forEach((a) => {
+    if (a.dataset.route === r) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  const hide = r === 'onboarding';
+  app.querySelector('.tabbar').hidden = hide;
+  app.querySelector('[data-side]').hidden = hide;
+  app.querySelector('[data-sidegoal]').hidden = hide;
+}
+
+const TITLES = { today: 'Today', goals: 'Goals', history: 'History', settings: 'Settings', onboarding: 'Welcome', log: 'Log a post' };
+
+function route(r) {
+  const s = getState();
+  if (!s.profile?.onboarded_at && r !== 'onboarding') r = 'onboarding';
+  if (s.profile?.onboarded_at && r === 'onboarding') r = 'today';
+
+  if (r === 'log') {
+    if (shown !== 'today') show('today');
+    if (!isSheetOpen()) openLog({ onClose: () => navigate('today', { replace: true }) });
+    document.title = `${TITLES.log} · LinkedInStreak`;
+    return;
+  }
+  if (isSheetOpen()) closeSheet();
+  show(r);
+  // A link shared before onboarding finished.
+  if (r === 'today' && s.profile?.onboarded_at) {
+    const pending = takeSharedLink();
+    if (pending) openLog({ prefill: pending, onClose: () => navigate('today', { replace: true }) });
+  }
+}
+
+function show(r) {
+  const changed = shown !== r;
+  shown = r;
+  markNav(r);
+  document.title = `${TITLES[r]} · LinkedInStreak`;
+  VIEWS[r].render(main, { navigate });
+  if (changed) {
+    window.scrollTo({ top: 0 });
+    main.focus({ preventScroll: true });
+  }
+}
+
+function onStore() {
+  sideGoal();
+  const av = app.querySelector('.avatar');
+  if (av) av.innerHTML = initial(getState().profile, getState().user);
+  if (shown && LIVE.has(shown)) VIEWS[shown].render(main, { navigate });
+}
+
+function wireOnline() {
+  const banner = app.querySelector('[data-offline]');
+  const update = () => {
+    const online = navigator.onLine;
+    banner.hidden = online;
+    if (getState().online !== online) {
+      set({ online });
+      if (online) refresh();
+    }
+  };
+  window.addEventListener('online', update);
+  window.addEventListener('offline', update);
+  update();
+}
+
+function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker
+    .register('/sw.js')
+    .then((reg) => {
+      const offerUpdate = (worker) =>
+        toast('Update available', {
+          duration: 0,
+          action: { label: 'Reload', onClick: () => worker.postMessage({ type: 'SKIP_WAITING' }) },
+        });
+      if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
+      reg.addEventListener('updatefound', () => {
+        const w = reg.installing;
+        w?.addEventListener('statechange', () => {
+          if (w.state === 'installed' && navigator.serviceWorker.controller) offerUpdate(w);
+        });
+      });
+    })
+    .catch(() => null);
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (reloading) return;
     reloading = true;
     location.reload();
   });
-
-  window.addEventListener('load', async () => {
-    try {
-      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      const offer = (worker) =>
-        toast('Update available', {
-          duration: 0,
-          action: { label: 'Reload', onClick: () => worker.postMessage({ type: 'SKIP_WAITING' }) },
-        });
-      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
-      reg.addEventListener('updatefound', () => {
-        const w = reg.installing;
-        w?.addEventListener('statechange', () => {
-          if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w);
-        });
-      });
-      // Check for updates when the app comes back into view.
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') reg.update().catch(() => {});
-      });
-    } catch {
-      /* SW is an enhancement */
-    }
+  // Notification click while the app is open: go to the log sheet.
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type === 'NAVIGATE' && e.data.route) navigate(e.data.route);
   });
 }
-
-boot();

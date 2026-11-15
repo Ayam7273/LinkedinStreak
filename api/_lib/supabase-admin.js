@@ -20,9 +20,11 @@ export function send(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+export const fail = (res, status, code, message, extra = {}) => send(res, status, { ok: false, code, message, ...extra });
+
 export function methodNotAllowed(res, allowed) {
   res.setHeader('Allow', allowed.join(', '));
-  return send(res, 405, { ok: false, code: 'METHOD', message: 'Method not allowed.' });
+  return fail(res, 405, 'METHOD', 'Method not allowed.');
 }
 
 export async function readJson(req) {
@@ -43,26 +45,7 @@ export async function readJson(req) {
   }
 }
 
-/**
- * Resolve the signed-in user from the Bearer token and make sure it's the owner.
- * Returns the user, or sends a 401/403 and returns null.
- */
-export async function requireOwner(req, res) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) {
-    send(res, 401, { ok: false, code: 'AUTH', message: 'Sign in again.' });
-    return null;
-  }
-  const { data, error } = await admin().auth.getUser(token);
-  if (error || !data?.user) {
-    send(res, 401, { ok: false, code: 'AUTH', message: 'Your session has expired. Sign in again.' });
-    return null;
-  }
-  const owner = process.env.OWNER_USER_ID;
-  if (owner && data.user.id !== owner) {
-    send(res, 403, { ok: false, code: 'FORBIDDEN', message: 'This account is not allowed here.' });
-    return null;
-  }
-  return data.user;
+export function clientIp(req) {
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return fwd || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
 }

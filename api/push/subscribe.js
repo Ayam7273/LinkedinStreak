@@ -1,11 +1,14 @@
 // POST { subscription } -> save (upsert by endpoint)
 // DELETE { endpoint }   -> remove
-import { admin, send, readJson, requireOwner, methodNotAllowed } from '../_lib/supabase-admin.js';
+import { admin, send, readJson, methodNotAllowed } from '../_lib/supabase-admin.js';
+import { requireUser } from '../_lib/auth.js';
+import { rateLimit } from '../_lib/rate-limit.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'DELETE') return methodNotAllowed(res, ['POST', 'DELETE']);
-  const user = await requireOwner(req, res);
+  const user = await requireUser(req, res);
   if (!user) return;
+  if (!(await rateLimit(res, [{ key: `push:user:${user.id}`, max: 60, windowSeconds: 3600 }]))) return;
   const body = await readJson(req);
   const db = admin();
 

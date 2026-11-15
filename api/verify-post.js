@@ -1,61 +1,94 @@
-// POST { url, note? } -> verify a LinkedIn post and save it.
+// POST { url, note? } -> verify a LinkedIn post against the user's active goal and save it.
 // The server is the source of truth: only this route inserts into `posts`.
-import { admin, send, readJson, requireOwner, methodNotAllowed } from './_lib/supabase-admin.js';
-import { parsePostUrl, decodeId, slugMatches, classifyEmbedHtml } from './_lib/linkedin.js';
-import { checkNewPost, summarise } from './_lib/streak.js';
+import { admin, send, fail, readJson, methodNotAllowed } from './_lib/supabase-admin.js';
+import { requireUser } from './_lib/auth.js';
+import { rateLimit, ipKey } from './_lib/rate-limit.js';
+import { parsePostUrl, decodeId, slugMatches, classifyEmbedHtml, isAllowedRedirect } from '../js/core/linkedin.js';
+import { checkNewPost } from '../js/core/streak.js';
 
-const UA = 'Mozilla/5.0 (compatible; LinkedStreak/2.0)';
-const fail = (res, status, code, message) => send(res, status, { ok: false, code, message });
+const UA = 'Mozilla/5.0 (compatible; LinkedInStreak/3.0; +https://linkedin-streak.vercel.app)';
+const EMBED_TTL_MS = 24 * 3600 * 1000;
 
-/** Follow lnkd.in redirects (max 5 hops, 4s total) and return the final LinkedIn URL. */
+/** Follow lnkd.in redirects: max 5 hops, 4s total, and ONLY to https *.linkedin.com / lnkd.in (no SSRF). */
 async function resolveShortLink(url) {
   const signal = AbortSignal.timeout(4000);
   let current = url;
   for (let hop = 0; hop < 5; hop++) {
+    if (!isAllowedRedirect(current)) return null;
     const r = await fetch(current, { redirect: 'manual', signal, headers: { 'User-Agent': UA } });
     const loc = r.headers.get('location');
     if (r.status >= 300 && r.status < 400 && loc) {
       current = new URL(loc, current).toString();
-      if (!/^https?:\/\/(?:[a-z0-9-]+\.)?lnkd\.in\//i.test(current)) return current;
+      if (!isAllowedRedirect(current)) return null;
+      if (!/^https:\/\/(www\.)?lnkd\.in\//i.test(current)) return current;
       continue;
     }
-    // lnkd.in sometimes answers 200 with an interstitial page that carries the target.
     if (r.ok) {
-      const html = await r.text();
-      const m = html.match(/https?:\/\/(?:[a-z0-9-]+\.)?linkedin\.com\/(?:posts|feed\/update)\/[^"'<>\s]+/i);
-      if (m) return m[0].replace(/&amp;/g, '&');
+      // lnkd.in sometimes answers 200 with an interstitial that carries the target.
+      const html = (await r.text()).slice(0, 200000);
+      const m = html.match(/https:\/\/(?:[a-z0-9-]+\.)?linkedin\.com\/(?:posts|feed\/update)\/[^"'<>\s]+/i);
+      return m ? m[0].replace(/&amp;/g, '&') : null;
     }
     return null;
   }
   return null;
 }
 
-/** One best-effort public embed fetch. Returns 'verified' | 'other' | 'unconfirmed'. */
-async function checkEmbedAuthor(urn, settings) {
-  try {
-    const r = await fetch(`https://www.linkedin.com/embed/feed/update/${urn}`, {
-      signal: AbortSignal.timeout(4000),
-      headers: { 'User-Agent': UA, 'Accept-Language': 'en-GB,en;q=0.8' },
-    });
-    if (!r.ok) return 'unconfirmed';
-    const html = await r.text();
-    return classifyEmbedHtml(html, { slug: settings.profile_slug, displayName: settings.display_name });
-  } catch {
-    return 'unconfirmed';
+/** One best-effort public embed fetch, cached per URN for 24h. */
+async function embedVerdict(urn, profile) {
+  const db = admin();
+  const { data: cached } = await db.from('embed_cache').select('*').eq('urn', urn).maybeSingle();
+  let ok = false;
+  let body = null;
+  if (cached && Date.now() - Date.parse(cached.fetched_at) < EMBED_TTL_MS) {
+    ok = cached.ok;
+    body = cached.body;
+  } else {
+    try {
+      const r = await fetch(`https://www.linkedin.com/embed/feed/update/${encodeURIComponent(urn).replace(/%3A/gi, ':')}`, {
+        signal: AbortSignal.timeout(4000),
+        headers: { 'User-Agent': UA, 'Accept-Language': 'en-GB,en;q=0.8' },
+        redirect: 'manual',
+      });
+      ok = r.ok;
+      body = r.ok ? (await r.text()).slice(0, 100000) : null;
+    } catch {
+      ok = false;
+    }
+    await db.from('embed_cache').upsert({ urn, ok, body, fetched_at: new Date().toISOString() });
   }
+  if (!ok || !body) return 'unconfirmed';
+  return classifyEmbedHtml(body, { slug: profile.linkedin_slug, displayName: profile.display_name });
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-  const user = await requireOwner(req, res);
+  const user = await requireUser(req, res);
   if (!user) return;
+
+  const allowed = await rateLimit(
+    res,
+    [
+      { key: `verify:user:${user.id}`, max: 20, windowSeconds: 3600 },
+      { key: ipKey('verify', req), max: 60, windowSeconds: 3600 },
+    ],
+    "That's a lot of checks in a short time. Please wait up to an hour and try again.",
+  );
+  if (!allowed) return;
 
   const body = await readJson(req);
   const original = String(body.url || '').trim().slice(0, 2000);
-  const note = body.note ? String(body.note).trim().slice(0, 280) : null;
+  const note = body.note ? String(body.note).trim().slice(0, 280) || null : null;
   const now = Date.now();
+  const db = admin();
 
-  // 1. Parse (and resolve short links)
+  // 0. Profile must have a LinkedIn URL.
+  const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  if (!profile?.linkedin_slug) {
+    return fail(res, 422, 'NO_PROFILE', 'Add your LinkedIn profile link in Settings before logging posts.');
+  }
+
+  // 1. Parse (and safely resolve short links).
   let parsed = parsePostUrl(original);
   if (!parsed.ok) return fail(res, 422, parsed.code, parsed.message);
   if (parsed.kind === 'short') {
@@ -65,79 +98,81 @@ export default async function handler(req, res) {
     } catch {
       resolved = null;
     }
-    if (!resolved) return fail(res, 422, 'BAD_URL', "Couldn't open that short link. Use \"Copy link to post\" instead.");
+    if (!resolved) return fail(res, 422, 'BAD_URL', "Couldn't open that short link. In LinkedIn, use \"Copy link to post\" instead.");
     parsed = parsePostUrl(resolved);
     if (!parsed.ok) return fail(res, 422, parsed.code, parsed.message);
     if (parsed.kind === 'short') return fail(res, 422, 'BAD_URL', "That short link doesn't lead to a post.");
   }
 
-  // 2. Decode publish time
+  // 2. Decode publish time.
   const decoded = decodeId(parsed.activityId, now);
   if (!decoded.ok) return fail(res, 422, decoded.code, decoded.message);
 
-  // 3. Load settings + posts
-  const db = admin();
-  const [{ data: settings, error: sErr }, { data: posts, error: pErr }] = await Promise.all([
-    db.from('settings').select('*').eq('user_id', user.id).maybeSingle(),
-    db.from('posts').select('activity_id, published_at, required_day').eq('user_id', user.id),
-  ]);
-  if (sErr || pErr) return fail(res, 500, 'SERVER', 'Could not load your data. Try again.');
-  if (!settings?.profile_slug) {
-    return fail(res, 422, 'NO_PROFILE', 'Add your LinkedIn profile link in Settings first.');
+  // 3. Author (slug check is free; embed fetch happens after the cheap rules).
+  if (parsed.kind === 'posts' && !slugMatches(parsed, profile.linkedin_slug)) {
+    return fail(res, 403, 'WRONG_AUTHOR', 'This post belongs to someone else.');
   }
 
-  // 4. Day rules (cheap, so before any network)
+  // 4. Goal rules.
+  const { data: goal } = await db.from('goals').select('*').eq('user_id', user.id).eq('status', 'active').maybeSingle();
+  if (!goal) return fail(res, 409, 'NO_ACTIVE_GOAL', 'You have no active goal. Create or resume one first.');
+  const [{ data: versions }, { data: pauses }, { data: posts }, { data: taken }] = await Promise.all([
+    db.from('goal_versions').select('*').eq('goal_id', goal.id),
+    db.from('goal_pauses').select('*').eq('goal_id', goal.id),
+    db.from('posts').select('activity_id, goal_id, published_at, logged_at, unit_key').eq('user_id', user.id),
+    db.from('posts').select('activity_id').eq('activity_id', parsed.activityId).neq('user_id', user.id),
+  ]);
+  const weekStart = profile.week_start || 'mon';
   const check = checkNewPost({
+    goal,
+    versions: versions || [],
+    pauses: pauses || [],
+    posts: posts || [],
+    takenActivityIds: (taken || []).map((t) => t.activity_id),
     activityId: parsed.activityId,
     publishedAt: decoded.publishedAt,
     now,
-    startDate: settings.start_date,
-    posts,
+    weekStart,
   });
   if (!check.ok) return fail(res, 409, check.code, check.message);
 
-  // 5. Author
-  let author;
-  if (parsed.kind === 'posts') {
-    if (!slugMatches(parsed, settings.profile_slug)) {
-      return fail(res, 403, 'WRONG_AUTHOR', 'This post belongs to someone else.');
-    }
-    author = 'verified';
-  } else {
-    const verdict = await checkEmbedAuthor(parsed.urn, settings);
+  let author = 'verified';
+  if (parsed.kind === 'urn') {
+    const verdict = await embedVerdict(parsed.urn, profile);
     if (verdict === 'other') return fail(res, 403, 'WRONG_AUTHOR', 'This post belongs to someone else.');
     author = verdict;
   }
 
-  // 6. Save
+  // 5. Save.
   const row = {
     user_id: user.id,
+    goal_id: goal.id,
     activity_id: parsed.activityId,
+    urn_type: parsed.urnType,
     url_original: original,
     url_canonical: parsed.canonical,
     published_at: new Date(decoded.publishedAt).toISOString(),
-    required_day: check.day,
+    unit_key: check.unitKey,
+    unit_kind: goal.mode === 'weekly' ? 'week' : 'day',
     author_status: author,
     note,
   };
-  const { data: saved, error: iErr } = await db.from('posts').insert(row).select().single();
-  if (iErr) {
-    if (iErr.code === '23505') {
-      const dup = /activity_id/.test(iErr.message || '') || /posts_activity_id_key/.test(iErr.details || '');
-      return dup
-        ? fail(res, 409, 'DUPLICATE', 'That post is already logged.')
+  const { data: saved, error } = await db.from('posts').insert(row).select().single();
+  if (error) {
+    if (error.code === '23505') {
+      return /activity_id/.test(`${error.message} ${error.details}`)
+        ? fail(res, 409, 'DUPLICATE', 'That post has already been logged.')
         : fail(res, 409, 'DAY_ALREADY_LOGGED', 'That day is already logged. One post counts per day.');
     }
-    return fail(res, 500, 'SERVER', 'Could not save the post. Try again.');
+    return fail(res, 500, 'SERVER', 'Could not save the post. Please try again.');
   }
 
-  const after = summarise({ startDate: settings.start_date, now, posts: [...posts, saved] });
   return send(res, 200, {
     ok: true,
-    day: check.day,
+    unit: check.unitKey,
     publishedAt: row.published_at,
     author,
-    streakAfter: after.current,
+    streak: { current: check.streakAfter, unit: check.unit },
     post: saved,
   });
 }

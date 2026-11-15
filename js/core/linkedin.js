@@ -16,8 +16,21 @@ export function extractUrl(text) {
   return bare ? 'https://' + bare[1].replace(/[),.;!?]+$/, '') : s;
 }
 
-function isLinkedInHost(host) {
-  return host === 'linkedin.com' || host.endsWith('.linkedin.com');
+export function isLinkedInHost(host) {
+  const h = String(host || '').toLowerCase();
+  return h === 'linkedin.com' || h.endsWith('.linkedin.com');
+}
+
+/** Short-link redirects may only go to https *.linkedin.com (or stay on lnkd.in). Prevents SSRF. */
+export function isAllowedRedirect(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return false;
+    const h = u.hostname.toLowerCase();
+    return isLinkedInHost(h) || h === 'lnkd.in' || h === 'www.lnkd.in';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -112,6 +125,9 @@ export function parsePostUrl(input) {
 
   if (/^\/in\/[^/]+/i.test(path)) return fail('BAD_URL', "That's a LinkedIn profile link, not a post.");
   if (/^\/(company|school|showcase)\//i.test(path)) return fail('BAD_URL', "That's a LinkedIn page, not a post.");
+  if (/^\/(article\/(new|edit)|post\/(new|edit))/i.test(path)) {
+    return fail('BAD_URL', "That's a link to the editor. Publish the post, then use \"Copy link to post\".");
+  }
   if (/^\/pulse\//i.test(path)) {
     return fail('BAD_URL', "That's an article link. Log the post that shared it instead.");
   }

@@ -1,179 +1,172 @@
-// Log-a-post sheet. Also the landing for the Android share target.
+// Log-a-post sheet (#/log). Also where Android shares land.
 import { sheet } from '../ui/sheet.js';
 import { toast } from '../ui/toast.js';
-import { icon, stampMark } from '../ui/icons.js';
-import { esc, reducedMotion, plural } from '../ui/dom.js';
-import { readPost, extractUrl, slugMatches } from '../linkedin.js';
-import { checkNewPost } from '../streak.js';
-import { formatInstant, weekdayName, formatDay } from '../time.js';
-import { getState, addPost, derived } from '../state.js';
-import { api } from '../supabase.js';
+import { icon, checkDraw } from '../ui/icons.js';
+import { esc, busy } from '../ui/dom.js';
+import { readPost, slugMatches } from '../core/linkedin.js';
+import { formatInstant } from '../core/time.js';
+import { getState, activeGoal, versionNow, profileTz, logPost, summaryFor, currentUnitFor } from '../state.js';
 
-const HARD_CLIENT_FAILS = new Set(['BAD_URL', 'NO_TIMESTAMP', 'NOT_REQUIRED_DAY', 'BEFORE_START', 'GRACE_EXPIRED', 'DUPLICATE', 'DAY_ALREADY_LOGGED', 'WRONG_AUTHOR']);
+const PROFILE_CODES = new Set(['NO_PROFILE']);
 
-/** Instant, client-side read of a link. */
-function localCheck(value) {
-  const s = getState();
-  const r = readPost(value);
-  if (!r.ok) return { kind: 'error', code: r.code, message: r.message };
-  if (r.kind === 'short') {
-    return { kind: 'info', message: 'Short link. It will be opened on the server when you log it.' };
-  }
-  const who = r.slug ? `@${r.slug}` : 'author checked on save';
-  const preview = `Published ${formatInstant(r.publishedAt)} · ${who}`;
-  if (r.slug && s.settings?.profile_slug && slugMatches(r, s.settings.profile_slug) === false) {
-    return { kind: 'error', code: 'WRONG_AUTHOR', message: 'This post belongs to someone else.', preview };
-  }
-  const check = checkNewPost({
-    activityId: r.activityId,
-    publishedAt: r.publishedAt,
-    now: Date.now(),
-    startDate: s.settings?.start_date,
-    posts: s.posts,
-  });
-  if (!check.ok) return { kind: 'error', code: check.code, message: check.message, preview };
-  return { kind: 'ok', preview, day: check.day };
-}
-
-export function openLogSheet({ prefill = '', onClose } = {}) {
+export function openLog({ prefill = '', onClose } = {}) {
   return sheet({
     title: 'Log a post',
-    initialFocus: prefill ? '#log-submit' : '#log-url',
+    initialFocus: prefill ? '[data-submit]' : '#post-url',
     onClose,
-    body(el, api$) {
+    body: (el, api) => {
+      const goal = activeGoal();
+      if (!goal) {
+        el.innerHTML = `
+          <div class="empty">
+            ${icon('goals')}
+            <p>You need an active goal before you can log posts.</p>
+            <a class="btn btn--primary" href="#/goals" data-go>Go to goals</a>
+          </div>`;
+        el.querySelector('[data-go]').addEventListener('click', () => api.close({ silent: true }));
+        return null;
+      }
+      const s = getState();
+      const tz = versionNow(goal.id)?.timezone || profileTz();
+      const slug = s.profile?.linkedin_slug || null;
+      const canPaste = !!navigator.clipboard?.readText;
+
       el.innerHTML = `
         <form class="stack" novalidate>
+          ${slug ? '' : `<div class="notice notice--warn">${icon('alert')}<div>Add your LinkedIn profile link first, so we can confirm posts are yours. <a href="#/settings" data-go>Open settings</a></div></div>`}
           <div class="field">
-            <label class="label field__label" for="log-url">Post link</label>
-            <div class="url-field">
-              <input class="input input--url" id="log-url" name="url" type="url" inputmode="url"
-                autocomplete="off" autocapitalize="off" spellcheck="false"
-                placeholder="linkedin.com/posts/…" aria-describedby="log-feedback" />
-              <button type="button" class="btn btn--quiet" id="log-paste">${icon('paste', { size: 'sm' })}<span>Paste</span></button>
+            <label class="label" for="post-url">Link to your post</label>
+            <div class="input-group">
+              <input class="input" id="post-url" name="url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+                placeholder="https://www.linkedin.com/posts/…" aria-describedby="post-hint post-preview">
+              <button type="button" class="btn" data-paste>${icon('paste')}Paste</button>
             </div>
-            <div id="log-feedback" class="preview" aria-live="polite"></div>
+            <p class="field__hint" id="post-hint">In LinkedIn, open the post's menu and choose "Copy link to post".</p>
+            <div id="post-preview" aria-live="polite"></div>
           </div>
           <div class="field">
-            <label class="label field__label" for="log-note">Note <span class="aside">(optional)</span></label>
-            <input class="input" id="log-note" name="note" type="text" maxlength="280" placeholder="What was it about?" />
+            <label class="label" for="post-note">Note <span class="faint">(optional)</span></label>
+            <textarea class="textarea" id="post-note" name="note" maxlength="280" rows="2" placeholder="What was it about?"></textarea>
           </div>
-          <button class="btn btn--primary" id="log-submit" type="submit">Verify &amp; log</button>
-          <p class="field__help">Use <b>Copy link to post</b> in LinkedIn. Only Friday, Saturday and Sunday posts count, and each day takes one post.</p>
+          <div class="field__error" data-error hidden></div>
+          <button type="submit" class="btn btn--primary btn--lg btn--block" data-submit>${icon('check')}Verify and log</button>
         </form>`;
 
       const form = el.querySelector('form');
-      const input = el.querySelector('#log-url');
-      const note = el.querySelector('#log-note');
-      const feedback = el.querySelector('#log-feedback');
-      const submit = el.querySelector('#log-submit');
-      const pasteBtn = el.querySelector('#log-paste');
-      let busy = false;
+      const input = el.querySelector('#post-url');
+      const preview = el.querySelector('#post-preview');
+      const errorEl = el.querySelector('[data-error]');
+      const pasteBtn = el.querySelector('[data-paste]');
+      el.querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', () => api.close({ silent: true })));
 
-      function renderFeedback() {
+      const showError = (msg, html = false) => {
+        errorEl.hidden = !msg;
+        errorEl.innerHTML = msg ? `${icon('alert')}<span>${html ? msg : esc(msg)}</span>` : '';
+      };
+
+      const update = () => {
+        showError('');
         const v = input.value.trim();
         if (!v) {
-          feedback.innerHTML = '';
+          preview.innerHTML = '';
           input.removeAttribute('aria-invalid');
-          submit.disabled = false;
+          return null;
+        }
+        const p = readPost(v);
+        if (!p.ok) {
+          input.setAttribute('aria-invalid', 'true');
+          preview.innerHTML = `<p class="preview preview--error mt-2">${icon('alert')}<span>${esc(p.message)}</span></p>`;
+          return null;
+        }
+        if (slug && slugMatches(p, slug) === false) {
+          input.setAttribute('aria-invalid', 'true');
+          preview.innerHTML = `<p class="preview preview--error mt-2">${icon('alert')}<span>This post belongs to @${esc(p.slug)}, not @${esc(slug)}.</span></p>`;
+          return null;
+        }
+        input.removeAttribute('aria-invalid');
+        const text =
+          p.kind === 'short'
+            ? "Short link. We'll open it to find the post when you verify."
+            : `Published ${formatInstant(p.publishedAt, tz)}${p.slug ? ` · @${p.slug}` : ''}`;
+        preview.innerHTML = `<p class="preview mt-2">${icon(p.kind === 'short' ? 'link' : 'calendar')}<span>${esc(text)}</span></p>`;
+        return p;
+      };
+
+      input.addEventListener('input', update);
+      if (prefill) {
+        input.value = prefill;
+        update();
+      }
+
+      pasteBtn.addEventListener('click', async () => {
+        if (!canPaste) {
+          input.focus();
+          toast('Press and hold in the box, then choose Paste.');
           return;
         }
-        const r = localCheck(v);
-        const preview = r.preview ? `<span class="field__ok">${esc(r.preview)}</span>` : '';
-        if (r.kind === 'error') {
-          feedback.innerHTML = `${preview}<span class="field__error">${esc(r.message)}</span>`;
-          input.setAttribute('aria-invalid', 'true');
-          submit.disabled = HARD_CLIENT_FAILS.has(r.code);
-        } else {
-          feedback.innerHTML = r.kind === 'ok' ? preview : `<span class="field__help">${esc(r.message)}</span>`;
-          input.removeAttribute('aria-invalid');
-          submit.disabled = false;
-        }
-      }
-
-      input.addEventListener('input', renderFeedback);
-      input.addEventListener('paste', () => setTimeout(() => {
-        input.value = extractUrl(input.value);
-        renderFeedback();
-      }));
-
-      // Paste button with graceful fallback
-      if (!navigator.clipboard?.readText) {
-        pasteBtn.hidden = true;
-      }
-      pasteBtn.addEventListener('click', async () => {
         try {
           const text = await navigator.clipboard.readText();
-          input.value = extractUrl(text);
-          renderFeedback();
-          submit.focus();
+          if (!text) {
+            toast('Your clipboard is empty. Copy the post link first.');
+            return;
+          }
+          input.value = text.trim();
+          update();
+          el.querySelector('[data-submit]').focus();
         } catch {
           input.focus();
-          feedback.innerHTML = '<span class="field__help">Paste access was blocked. Long-press the field and choose Paste.</span>';
+          toast('Paste was blocked. Press and hold in the box, then choose Paste.');
         }
       });
 
-      if (prefill) {
-        input.value = extractUrl(prefill);
-        renderFeedback();
-      }
-
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (busy) return;
-        const url = input.value.trim();
-        if (!url) {
-          feedback.innerHTML = '<span class="field__error">Paste the link to your post.</span>';
-          input.setAttribute('aria-invalid', 'true');
+        const parsed = update();
+        if (!parsed) {
+          if (!input.value.trim()) showError('Paste the link to your post.');
           input.focus();
           return;
         }
-        busy = true;
-        const before = derived().current;
-        submit.disabled = true;
-        submit.textContent = 'Checking…';
-        feedback.innerHTML = '<span class="checking">Checking the link…</span>';
-
-        const res = await api('/api/verify-post', { method: 'POST', body: { url, note: note.value.trim() || undefined } });
-        busy = false;
-
-        if (!res.ok) {
-          submit.disabled = false;
-          submit.textContent = 'Verify & log';
-          feedback.innerHTML = `<span class="field__error">${esc(res.message || 'Could not log that post.')}</span>`;
-          input.setAttribute('aria-invalid', 'true');
-          input.focus();
+        const btn = el.querySelector('[data-submit]');
+        const restore = busy(btn, 'Checking…');
+        const r = await logPost({ url: input.value.trim(), note: el.querySelector('#post-note').value.trim() || undefined });
+        if (!r.ok) {
+          restore();
+          if (PROFILE_CODES.has(r.code)) {
+            showError(`${esc(r.message)} <a href="#/settings" data-go2>Open settings</a>`, true);
+            errorEl.querySelector('[data-go2]')?.addEventListener('click', () => api.close({ silent: true }));
+          } else {
+            showError(r.message || 'Something went wrong. Try again.');
+          }
           return;
         }
-
-        // Success: stamp, then close and update Today.
-        const label = `${weekdayName(res.day)} ${formatDay(res.day, { weekday: false })}`;
-        api$.setTitle('Logged');
-        el.innerHTML = `
-          <div class="stack" aria-live="polite">
-            <div class="logged">
-              <span class="day__mark${reducedMotion() ? '' : ' is-stamping'}">${stampMark()}</span>
-              <div>
-                <p>Logged for ${esc(label)}.</p>
-                <p class="aside">Published ${esc(formatInstant(res.publishedAt))}</p>
-              </div>
-            </div>
-            ${res.author === 'unconfirmed'
-              ? '<p class="field__help">The author couldn\'t be confirmed from this link. Next time, use <b>Copy link to post</b> so the link includes your name.</p>'
-              : ''}
-          </div>`;
-
-        const wait = reducedMotion() ? 600 : res.author === 'unconfirmed' ? 2600 : 1100;
-        setTimeout(() => {
-          // Close first so the stamp lands on Today in view, not behind the scrim.
-          api$.close();
-          setTimeout(() => {
-            addPost(res.post, { from: before, to: res.streakAfter });
-            toast(`Logged. ${plural(res.streakAfter, 'day', 'days')}.`);
-          }, reducedMotion() ? 0 : 200);
-        }, wait);
+        done(el, api, r);
       });
 
       return null;
     },
   });
+}
+
+function done(el, api, r) {
+  const goal = activeGoal();
+  const sum = summaryFor(goal);
+  const n = sum?.current ?? r.streak?.current ?? 0;
+  const word = sum?.unit === 'weeks' ? 'week' : 'day';
+  let line = `Logged — ${n}-${word} streak`;
+  if (sum?.mode === 'weekly') {
+    const unit = currentUnitFor(goal);
+    if (unit && unit.state !== 'complete') line = `Logged — ${Math.min(unit.count, unit.needed)} of ${unit.needed} this week`;
+  }
+  const verified = r.author === 'verified';
+  el.innerHTML = `
+    <div class="check-draw">
+      ${checkDraw()}
+      <h3>${esc(line)}</h3>
+      <p class="small muted">${verified ? 'Verified as your post.' : "Logged. We couldn't confirm the author automatically, so it's marked unconfirmed."}</p>
+    </div>
+    <button type="button" class="btn btn--primary btn--lg btn--block" data-done>Done</button>`;
+  el.querySelector('[data-done]').addEventListener('click', () => api.close());
+  el.querySelector('[data-done]').focus();
+  toast(line);
 }

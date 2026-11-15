@@ -1,27 +1,27 @@
-// Data fetching, caching and a tiny pub/sub store.
-import { supabase } from './supabase.js';
-import { summarise } from './streak.js';
-import { nextFriday, londonDate } from './time.js';
-import { DEFAULT_REMINDER_TIMES, DEFAULT_GRACE_TIME } from './reminders.js';
-
-const CACHE_KEY = 'ls2:cache';
-const LEGACY_KEYS = ['linkedstreak_v1'];
+// Store + data fetching. Reads go straight to Supabase (RLS keeps every user to their own rows);
+// goal writes and post logging go through /api so the server validates them.
+// Streaks are never stored: they are derived from the rows on every render.
+import { supabase, api } from './supabase.js';
+import { summarise, currentUnit } from './core/streak.js';
+import { currentVersion } from './core/schedule.js';
+import { detectTimeZone, isValidTimeZone, dateIn } from './core/time.js';
 
 const store = {
   status: 'idle', // idle | loading | ready | error
   error: null,
   user: null,
-  settings: null,
+  profile: null,
+  goals: [],
+  versions: {}, // goal_id -> versions[]
+  pauses: {}, // goal_id -> pauses[]
   posts: [],
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
-  lastStamped: null, // { day, from, to } for the stamp + numeral animation
+  bump: null, // { from, to } after a log, for the count-up
 };
 
 const listeners = new Set();
 
-export function getState() {
-  return store;
-}
+export const getState = () => store;
 
 export function subscribe(fn) {
   listeners.add(fn);
@@ -37,139 +37,132 @@ export function set(patch) {
   emit();
 }
 
-/** Derived numbers. Never stored. */
-export function derived(now = Date.now()) {
-  return summarise({ startDate: store.settings?.start_date || null, now, posts: store.posts });
+// ---- Derived ---------------------------------------------------------------
+export const weekStart = () => store.profile?.week_start || 'mon';
+export const profileTz = () => (isValidTimeZone(store.profile?.timezone) ? store.profile.timezone : detectTimeZone());
+export const profileToday = (now = Date.now()) => dateIn(now, profileTz());
+export const activeGoal = () => store.goals.find((g) => g.status === 'active') || null;
+export const goalById = (id) => store.goals.find((g) => g.id === id) || null;
+export const versionsOf = (id) => store.versions[id] || [];
+export const pausesOf = (id) => store.pauses[id] || [];
+export const versionNow = (id) => currentVersion(versionsOf(id));
+
+export function summaryFor(goal, now = Date.now()) {
+  if (!goal || !versionsOf(goal.id).length) return null;
+  return summarise({
+    goal,
+    versions: versionsOf(goal.id),
+    pauses: pausesOf(goal.id),
+    posts: store.posts,
+    now,
+    weekStart: weekStart(),
+  });
 }
 
-// ---- local cache (per-device convenience only) -----------------------------
-function readCache() {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
+export function currentUnitFor(goal, now = Date.now()) {
+  const s = summaryFor(goal, now);
+  return s ? currentUnit(s, weekStart()) : null;
+}
+
+/** 'scheduled' when the start date is still ahead, otherwise the stored status (or completed). */
+export function goalStatus(goal, now = Date.now()) {
+  if (goal.status === 'active' || goal.status === 'paused') {
+    const tz = versionNow(goal.id)?.timezone || profileTz();
+    const today = dateIn(now, tz);
+    if (goal.end_date && today > goal.end_date) return 'completed';
+    if (goal.status === 'active' && today < goal.start_date) return 'scheduled';
   }
+  return goal.status;
 }
 
-function writeCache() {
-  try {
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({ userId: store.user?.id, settings: store.settings, posts: store.posts }),
-    );
-  } catch {
-    /* storage unavailable */
-  }
+// ---- Loading -----------------------------------------------------------------
+function group(rows, key) {
+  const out = {};
+  for (const r of rows || []) (out[r[key]] ||= []).push(r);
+  return out;
 }
 
-export function clearLegacy() {
-  try {
-    for (const k of LEGACY_KEYS) localStorage.removeItem(k);
-  } catch {
-    /* ignore */
-  }
-}
-
-export function clearCache() {
-  try {
-    localStorage.removeItem(CACHE_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-// ---- loading ---------------------------------------------------------------
-function defaultSettings(userId) {
-  return {
-    user_id: userId,
-    display_name: '',
-    profile_url: '',
-    profile_slug: '',
-    start_date: nextFriday(londonDate(Date.now())),
-    reminder_times: DEFAULT_REMINDER_TIMES,
-    grace_reminder_time: DEFAULT_GRACE_TIME,
-    reminders_enabled: true,
-  };
-}
-
-export async function load(user) {
-  const cached = readCache();
-  if (cached && cached.userId === user.id) {
-    set({ user, settings: cached.settings, posts: cached.posts || [], status: 'ready' });
-  } else {
-    set({ user, status: 'loading' });
-  }
-
+export async function load({ quiet = false } = {}) {
+  if (!quiet) set({ status: store.status === 'ready' ? 'ready' : 'loading', error: null });
   try {
     const sb = await supabase();
-    const [{ data: settings, error: sErr }, { data: posts, error: pErr }] = await Promise.all([
-      sb.from('settings').select('*').eq('user_id', user.id).maybeSingle(),
-      sb.from('posts').select('*').eq('user_id', user.id).order('published_at', { ascending: false }),
+    const { data: auth } = await sb.auth.getUser();
+    const user = auth?.user;
+    if (!user) throw new Error('Signed out');
+
+    const [profile, goals, posts] = await Promise.all([
+      sb.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+      sb.from('goals').select('*').order('created_at', { ascending: true }),
+      sb.from('posts').select('*').order('published_at', { ascending: false }),
     ]);
-    if (sErr) throw sErr;
-    if (pErr) throw pErr;
+    for (const r of [profile, goals, posts]) if (r.error) throw r.error;
 
-    let s = settings;
-    if (!s) {
-      const fresh = defaultSettings(user.id);
-      const { data, error } = await sb.from('settings').insert(fresh).select().single();
-      if (error) throw error;
-      s = data;
+    const ids = (goals.data || []).map((g) => g.id);
+    let versions = { data: [] };
+    let pauses = { data: [] };
+    if (ids.length) {
+      [versions, pauses] = await Promise.all([
+        sb.from('goal_versions').select('*').in('goal_id', ids).order('effective_from'),
+        sb.from('goal_pauses').select('*').in('goal_id', ids).order('from_date'),
+      ]);
+      for (const r of [versions, pauses]) if (r.error) throw r.error;
     }
-    set({ settings: s, posts: posts || [], status: 'ready', error: null });
-    writeCache();
+
+    set({
+      status: 'ready',
+      error: null,
+      user,
+      profile: profile.data || { id: user.id, timezone: detectTimeZone(), week_start: 'mon' },
+      goals: goals.data || [],
+      versions: group(versions.data, 'goal_id'),
+      pauses: group(pauses.data, 'goal_id'),
+      posts: posts.data || [],
+    });
   } catch (err) {
-    if (store.status === 'ready') {
-      set({ error: err });
-    } else {
-      set({ status: 'error', error: err });
-    }
+    set({ status: 'error', error: err?.message || 'Could not load your data.' });
   }
+  return store;
 }
 
-// ---- mutations -------------------------------------------------------------
-export async function saveSettings(patch) {
+export const refresh = () => load({ quiet: true });
+
+// ---- Writes ----------------------------------------------------------------
+export async function saveProfile(patch) {
   const sb = await supabase();
-  const next = { ...store.settings, ...patch };
-  const { data, error } = await sb
-    .from('settings')
-    .update(patch)
-    .eq('user_id', store.user.id)
-    .select()
-    .single();
-  if (error) throw error;
-  set({ settings: data || next });
-  writeCache();
-  return data;
+  const { data, error } = await sb.from('profiles').update(patch).eq('id', store.user.id).select().single();
+  if (error) {
+    const msg = /timezone/i.test(error.message)
+      ? "That timezone isn't recognised."
+      : /linkedin_slug/.test(error.message)
+        ? "That LinkedIn profile link doesn't look right."
+        : 'Could not save your profile. Try again.';
+    return { ok: false, message: msg };
+  }
+  set({ profile: data });
+  return { ok: true, profile: data };
 }
 
-export function addPost(post, { from, to }) {
-  const posts = [post, ...store.posts.filter((p) => p.id !== post.id)].sort((a, b) =>
-    a.published_at < b.published_at ? 1 : -1,
-  );
-  set({ posts, lastStamped: { day: post.required_day, from, to } });
-  writeCache();
+export async function goalAction(body) {
+  const r = await api('/api/goals', { method: 'POST', body });
+  if (r.ok) await refresh();
+  return r;
 }
 
-export function consumeStamp() {
-  const s = store.lastStamped;
-  store.lastStamped = null;
-  return s;
+export async function logPost({ url, note }) {
+  const before = summaryFor(activeGoal())?.current ?? 0;
+  const r = await api('/api/verify-post', { method: 'POST', body: { url, note } });
+  if (r.ok) {
+    await refresh();
+    const after = summaryFor(activeGoal())?.current ?? before;
+    set({ bump: after !== before ? { from: before, to: after } : null });
+  }
+  return r;
 }
 
-export async function deletePost(id) {
+export async function removePost(id) {
   const sb = await supabase();
-  const { error } = await sb.from('posts').delete().eq('id', id).eq('user_id', store.user.id);
-  if (error) throw error;
+  const { error } = await sb.from('posts').delete().eq('id', id);
+  if (error) return { ok: false, message: 'Could not remove that entry. Try again.' };
   set({ posts: store.posts.filter((p) => p.id !== id) });
-  writeCache();
-}
-
-export async function eraseAllPosts() {
-  const sb = await supabase();
-  const { error } = await sb.from('posts').delete().eq('user_id', store.user.id);
-  if (error) throw error;
-  set({ posts: [] });
-  writeCache();
+  return { ok: true };
 }

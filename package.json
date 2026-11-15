@@ -1,5 +1,5 @@
 {
-  "name": "linkedstreak",
+  "name": "LinkedInStreak",
   "version": "2.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "login": "node scripts/login-link.mjs",
-    "test": "node --test",
+    "test": "node --test \"tests/*.test.js\"",
     "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sign in · LinkedInStreak</title>
+  <meta name="description" content="Sign in to LinkedInStreak with a magic link or Google.">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="color-scheme" content="light">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="LinkedInStreak">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <script type="module" src="/js/login.js"></script>
+</head>
+<body>
+  <main class="center-page">
+    <div class="card auth-card">
+      <a href="/" aria-label="LinkedInStreak home"><span data-logo="lg"></span></a>
+      <div class="stack" id="login" aria-live="polite">
+        <span class="skeleton skeleton--lg"></span>
+        <span class="skeleton"></span>
+        <span class="skeleton skeleton--lg"></span>
+      </div>
+    </div>
+  </main>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

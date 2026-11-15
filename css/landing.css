@@ -1,0 +1,265 @@
+/* Landing page sections only. */
+
+.l-nav {
+  position: sticky;
+  top: var(--zero);
+  z-index: var(--z-appbar);
+  padding: var(--s-3) var(--zero);
+  pointer-events: none; /* only the bar itself takes clicks */
+}
+
+.l-nav__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: var(--appbar-h);
+  padding: var(--zero) var(--s-2) var(--zero) var(--s-5);
+  background: transparent;
+  border: var(--line-blue-bold);
+  border-radius: var(--radius-pill);
+  pointer-events: auto;
+  transition: background var(--dur-med) var(--ease), box-shadow var(--dur-med) var(--ease);
+}
+
+/* Once content scrolls under it, frosted glass so text behind stays out of the way. */
+.l-nav.is-scrolled .l-nav__inner {
+  background: var(--nav-glass);
+  -webkit-backdrop-filter: var(--nav-blur);
+  backdrop-filter: var(--nav-blur);
+  box-shadow: var(--shadow-2);
+}
+
+/* The hero runs up behind the floating nav. */
+.l-nav + main > .l-hero:first-child {
+  margin-top: calc(var(--nav-float-h) * -1);
+  padding-top: calc(var(--nav-float-h) + var(--s-8));
+}
+
+.l-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.l-hero {
+  background-color: var(--surface);
+  background-image: var(--grid-dot);
+  background-size: var(--grid-size) var(--grid-size);
+  border-bottom: var(--line);
+  padding: var(--s-8) var(--zero) var(--s-9);
+}
+
+.l-hero__grid {
+  display: grid;
+  grid-template-columns: minmax(var(--zero), 1fr);
+  gap: var(--s-8);
+  align-items: center;
+}
+
+.l-hero__grid > * {
+  min-width: var(--zero);
+}
+
+.l-hero h1 {
+  font-size: var(--fs-display);
+  max-width: var(--app-max);
+}
+
+.l-hero__sub {
+  margin-top: var(--s-4);
+  max-width: var(--sheet-max-w);
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+}
+
+.l-hero__cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-6);
+}
+
+.l-preview {
+  display: grid;
+  grid-template-columns: minmax(var(--zero), 1fr);
+  gap: var(--s-3);
+  max-width: var(--sheet-max-w);
+}
+
+.l-preview .card {
+  box-shadow: var(--shadow-2);
+}
+
+.l-section {
+  padding: var(--s-9) var(--zero);
+}
+
+.l-section + .l-section {
+  border-top: var(--line);
+}
+
+.l-section__head {
+  max-width: var(--app-max);
+  margin-bottom: var(--s-7);
+}
+
+.l-section__head p {
+  margin-top: var(--s-3);
+  color: var(--text-muted);
+  font-size: var(--fs-lg);
+}
+
+.l-steps {
+  display: grid;
+  gap: var(--s-4);
+  counter-reset: lstep;
+}
+
+.l-step {
+  counter-increment: lstep;
+}
+
+.l-step::before {
+  content: counter(lstep);
+  display: grid;
+  place-items: center;
+  width: var(--avatar);
+  height: var(--avatar);
+  margin-bottom: var(--s-4);
+  border-radius: var(--round);
+  background: var(--blue-wash);
+  color: var(--blue);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.l-step h3,
+.l-feature h3 {
+  font-size: var(--fs-md);
+  margin-bottom: var(--s-2);
+}
+
+.l-step p,
+.l-feature p {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.l-features {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(var(--card-min), 1fr));
+}
+
+.l-feature .icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  margin-bottom: var(--s-4);
+  color: var(--blue);
+}
+
+.l-faq {
+  border-top: var(--line);
+}
+
+.l-faq details {
+  border-bottom: var(--line);
+}
+
+.l-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: var(--control-h-lg);
+  padding: var(--s-3) var(--zero);
+  font-weight: var(--fw-semi);
+  cursor: pointer;
+  list-style: none;
+}
+
+.l-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.l-faq summary .icon {
+  color: var(--text-muted);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.l-faq details[open] summary .icon {
+  transform: rotate(var(--turn-eighth));
+}
+
+.l-faq details p {
+  padding-bottom: var(--s-4);
+  color: var(--text-muted);
+}
+
+.l-cta {
+  text-align: center;
+  background: var(--blue-wash);
+}
+
+.l-cta h2 {
+  margin-bottom: var(--s-5);
+}
+
+.l-footer {
+  margin-top: auto;
+  padding: var(--s-7) var(--zero);
+  border-top: var(--line);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.l-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.l-footer__links {
+  display: flex;
+  gap: var(--s-4);
+}
+
+.l-footer__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+}
+
+.l-footer__disclaimer {
+  margin-top: var(--s-3);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}
+
+@media (max-width: 899px) {
+  .l-nav .hide-sm {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .l-hero {
+    padding-bottom: var(--s-9);
+  }
+
+  .l-nav + main > .l-hero:first-child {
+    padding-top: calc(var(--nav-float-h) + var(--s-9));
+  }
+
+  .l-hero__grid {
+    grid-template-columns: minmax(var(--zero), 7fr) minmax(var(--zero), 5fr);
+  }
+
+  .l-steps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

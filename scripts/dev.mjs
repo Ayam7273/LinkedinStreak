@@ -68,7 +68,7 @@ function notFound(res) {
 }
 
 async function serveStatic(res, pathname) {
-  let p = pathname === '/' || pathname === '/share' ? '/index.html' : pathname;
+  let p = pathname === '/' ? '/index.html' : pathname;
   const file = normalize(join(root, decodeURIComponent(p)));
   if (!file.startsWith(root) || /[\\/](node_modules|\.git|\.env)/.test(file.slice(root.length))) return notFound(res);
   try {
@@ -104,6 +104,6 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`LinkedStreak dev server: http://localhost:${PORT}`);
+    console.log(`LinkedInStreak dev server: http://localhost:${PORT}`);
     if (!process.env.SUPABASE_URL) console.log('No SUPABASE_URL yet: the app will show "Not set up yet". Copy .env.example to .env.local and fill it in.');
   });

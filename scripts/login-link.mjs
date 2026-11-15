@@ -34,11 +34,11 @@ const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { pe
 const { data, error } = await admin.auth.admin.generateLink({
   type: 'magiclink',
   email,
-  options: { redirectTo: `${site.replace(/\/+$/, '')}/` },
+  options: { redirectTo: `${site.replace(/\/+$/, '')}/app.html` },
 });
 if (error) {
   console.error('Could not create a link:', error.message);
-  if (/not found|User/i.test(error.message)) console.error('Add this email under Supabase → Authentication → Users first.');
+  if (/not found|User/i.test(error.message)) console.error('Sign up once on the login page (or add the user under Supabase → Authentication → Users) first.');
   process.exit(1);
 }
 

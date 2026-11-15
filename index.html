@@ -3,58 +3,166 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>LinkedStreak</title>
-  <meta name="description" content="A ledger for posting on LinkedIn every Friday, Saturday and Sunday.">
-
-  <meta name="theme-color" content="#F4F0E8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14120F" media="(prefers-color-scheme: dark)">
-  <meta name="color-scheme" content="light dark">
-
+  <title>LinkedInStreak · Build a LinkedIn posting habit that sticks</title>
+  <meta name="description" content="Set your own posting schedule, get every LinkedIn post confirmed, and keep your streak going with reminders.">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="color-scheme" content="light">
+  <meta property="og:title" content="LinkedInStreak">
+  <meta property="og:description" content="Build a LinkedIn posting habit that sticks.">
+  <meta property="og:image" content="/icons/icon-512.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Streak">
-
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&amp;display=swap">
-
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&amp;display=swap">
   <link rel="stylesheet" href="/css/tokens.css">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/components.css">
-
-  <script>
-    // Apply the saved theme before first paint.
-    try {
-      var t = localStorage.getItem('ls2:theme');
-      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-    } catch (e) {}
-  </script>
-  <script type="module" src="/js/app.js"></script>
+  <link rel="stylesheet" href="/css/landing.css">
+  <script type="module" src="/js/ui/logo.js"></script>
+  <script type="module" src="/js/ui/nav.js"></script>
 </head>
 <body>
-  <div class="banner" id="offline" role="status" hidden>Offline. Showing what this device last saw.</div>
-  <div id="app">
-    <div class="shell">
-      <header class="masthead frame">
-        <div class="masthead__inner">
-          <span class="wordmark">LinkedStreak</span>
+  <div class="page">
+    <header class="l-nav">
+      <div class="container">
+      <div class="l-nav__inner">
+        <span data-brand="/"></span>
+        <nav class="l-nav__actions" aria-label="Account">
+          <a class="btn btn--outline" href="/login.html">Get Started</a>
+        </nav>
+      </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="l-hero" aria-labelledby="hero-title">
+        <div class="container l-hero__grid">
+          <div>
+            <h1 id="hero-title">Build a LinkedIn posting habit that sticks</h1>
+            <p class="l-hero__sub">Set your own schedule, post on LinkedIn, then paste the link. LinkedInStreak confirms every post and keeps your streak honest.</p>
+            <div class="l-hero__cta">
+              <a class="btn btn--outline btn--lg" href="/login.html">Get Started</a>
+            </div>
+          </div>
+
+          <div class="l-preview" role="img" aria-label="Example: a 13-day streak with Friday's post due today, and a heatmap of six months of posts">
+            <div class="card hero-card" aria-hidden="true">
+              <span class="label">Current streak</span>
+              <div class="streak">
+                <span class="streak__num is-live">13</span>
+                <span class="streak__unit">days</span>
+                <svg class="icon flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+              </div>
+              <p class="streak__meta">Best 21 · 94% completion</p>
+              <ol class="pills mt-4">
+                <li class="pill pill--off"><span class="pill__day">Mon</span><span class="pill__date">9</span><span class="icon icon--sm"></span></li>
+                <li class="pill pill--off"><span class="pill__day">Tue</span><span class="pill__date">10</span><span class="icon icon--sm"></span></li>
+                <li class="pill pill--off"><span class="pill__day">Wed</span><span class="pill__date">11</span><span class="icon icon--sm"></span></li>
+                <li class="pill pill--off"><span class="pill__day">Thu</span><span class="pill__date">12</span><span class="icon icon--sm"></span></li>
+                <li class="pill pill--open is-today"><span class="pill__day">Fri</span><span class="pill__date">13</span><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></li>
+                <li class="pill pill--upcoming"><span class="pill__day">Sat</span><span class="pill__date">14</span><svg class="icon" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg></li>
+                <li class="pill pill--upcoming"><span class="pill__day">Sun</span><span class="pill__date">15</span><svg class="icon" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg></li>
+              </ol>
+              <div class="row mt-3"><span class="chip chip--blue"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Due today</span></div>
+            </div>
+            <div class="card" aria-hidden="true">
+              <div class="card__head"><span class="card__title">58 posts logged</span><span class="small muted">Last 6 months</span></div>
+              <div class="heat-scroll"><div class="heat"><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell is-missed" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="4"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="2"></span><span class="heat__cell" data-level="0"></span><span class="heat__cell" data-level="3"></span><span class="heat__cell is-empty"></span><span class="heat__cell is-empty"></span></div></div>
+            </div>
+          </div>
         </div>
-      </header>
-      <main class="content frame content--bare" aria-busy="true">
-        <span class="skeleton skeleton--hero"></span>
-        <span class="skeleton"></span>
-        <span class="skeleton skeleton--short"></span>
-      </main>
-    </div>
+      </section>
+
+      <section class="l-section" id="how" aria-labelledby="how-title">
+        <div class="container">
+          <div class="l-section__head">
+            <h2 id="how-title">How it works</h2>
+            <p>Three steps. No LinkedIn password, no browser extension.</p>
+          </div>
+          <ol class="l-steps">
+            <li class="card l-step"><h3>Set your goal</h3><p>Pick the days you want to post, like Friday to Sunday, or a target such as three posts a week. Add an end date if you like.</p></li>
+            <li class="card l-step"><h3>Post on LinkedIn</h3><p>Write and publish as you normally would. We'll remind you on posting days at times you choose.</p></li>
+            <li class="card l-step"><h3>Paste the link, we verify it</h3><p>Copy the link to your post and paste it in, or share it straight from the LinkedIn app. We check the date and that it's yours.</p></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="l-section" aria-labelledby="features-title">
+        <div class="container">
+          <div class="l-section__head"><h2 id="features-title">Everything you need to stay consistent</h2></div>
+          <div class="l-features">
+            <div class="card l-feature">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>
+              <h3>Custom schedules</h3><p>Specific days or a weekly target, in your own timezone, with a grace period for late-night posts.</p>
+            </div>
+            <div class="card l-feature">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+              <h3>Verified posts</h3><p>The publish time is read from the post's own ID, so an old post can't fake a streak.</p>
+            </div>
+            <div class="card l-feature">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              <h3>Reminders</h3><p>Push notifications at your times, in your timezone. Never between 22:00 and 07:00.</p>
+            </div>
+            <div class="card l-feature">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+              <h3>Streak history</h3><p>A year of posting at a glance, with every logged post and its note.</p>
+            </div>
+            <div class="card l-feature">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+              <h3>Installable app</h3><p>Add it to your home screen on iPhone or Android. On Android, share a post from LinkedIn straight in.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="l-section" aria-labelledby="faq-title">
+        <div class="container">
+          <div class="l-section__head"><h2 id="faq-title">Frequently Asked Questions</h2></div>
+          <div class="l-faq">
+            <details>
+              <summary>How does verification work?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></summary>
+              <p>Every LinkedIn post link contains an ID, and that ID encodes the moment the post was published. We read the date from it, check the post belongs to your profile using the name in the link, and make one public check of the post's embed page where we can. There's no LinkedIn API and no access to your account.</p>
+            </details>
+            <details>
+              <summary>Do you need my LinkedIn password?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></summary>
+              <p>No. We never ask for your LinkedIn password and never connect to your LinkedIn account. You only give us your public profile link.</p>
+            </details>
+            <details>
+              <summary>What if I post late at night?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></summary>
+              <p>Each goal has a grace period of up to 24 hours. The post must be published on the day, but you can log it the next morning.</p>
+            </details>
+            <details>
+              <summary>Can I take a break?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></summary>
+              <p>Yes. Pause a goal for a holiday and the paused days never count against your streak.</p>
+            </details>
+            <details>
+              <summary>Is it free?<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></summary>
+              <p>Yes. You can export or delete your data at any time from Settings.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="l-section l-cta" aria-labelledby="cta-title">
+        <div class="container">
+          <h2 id="cta-title">Start your streak this week</h2>
+          <a class="btn btn--outline btn--lg" href="/login.html">Get Started</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="l-footer">
+      <div class="container">
+        <div class="l-footer__row">
+          <span>LinkedInStreak</span>
+          <nav class="l-footer__links" aria-label="Legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></nav>
+        </div>
+        <p class="l-footer__disclaimer">Not affiliated with or endorsed by LinkedIn.</p>
+      </div>
+    </footer>
   </div>
-  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
-  <noscript><p class="frame">LinkedStreak needs JavaScript.</p></noscript>
 </body>
 </html>

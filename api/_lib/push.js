@@ -16,13 +16,17 @@ function configure() {
 
 /**
  * Send one payload to every subscription the user has.
- * 404/410 -> subscription deleted. Other errors -> failure_count + 1.
+ * 404/410 -> subscription deleted. Other errors -> failure_count + 1; deleted after 10.
  */
-export async function sendToUser(userId, payload) {
+export async function sendToUser(userId, payload, preloaded = null) {
   configure();
   const db = admin();
-  const { data: subs, error } = await db.from('push_subscriptions').select('*').eq('user_id', userId);
-  if (error) throw error;
+  let subs = preloaded;
+  if (!subs) {
+    const { data, error } = await db.from('push_subscriptions').select('*').eq('user_id', userId);
+    if (error) throw error;
+    subs = data;
+  }
 
   const result = { sent: 0, removed: 0, failed: 0, total: subs.length };
   const body = JSON.stringify(payload);
@@ -47,10 +51,13 @@ export async function sendToUser(userId, payload) {
           await db.from('push_subscriptions').delete().eq('id', s.id);
         } else {
           result.failed += 1;
-          await db
-            .from('push_subscriptions')
-            .update({ failure_count: (s.failure_count || 0) + 1 })
-            .eq('id', s.id);
+          const failures = (s.failure_count || 0) + 1;
+          if (failures >= 10) {
+            result.removed += 1;
+            await db.from('push_subscriptions').delete().eq('id', s.id);
+          } else {
+            await db.from('push_subscriptions').update({ failure_count: failures }).eq('id', s.id);
+          }
         }
       }
     }),
