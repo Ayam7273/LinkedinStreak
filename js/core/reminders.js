@@ -36,10 +36,10 @@ export function daysCopy({ idx, total, weekday, streak }) {
   if (last) return 'Last call — post before midnight or your streak resets.';
   if (idx === 0) {
     return streak > 0
-      ? `${weekday}'s post is due — your ${streak}-day streak is waiting.`
-      : `${weekday}'s post is due — post today to start a streak.`;
+      ? `${weekday}'s post is due, your ${streak}-day streak is waiting.`
+      : `${weekday}'s post is due, post today to start a streak.`;
   }
-  return streak > 0 ? `Still time — post today to keep your ${streak}-day streak.` : 'Still time — post today.';
+  return streak > 0 ? `Still time, post today to keep your ${streak}-day streak.` : 'Still time, post today.';
 }
 
 export function weeklyCopy({ count, target, daysLeft, urgentLast }) {

@@ -27,7 +27,7 @@ test('nothing before the first slot; first slot mentions the streak', () => {
 });
 
 test('slots escalate through the day', () => {
-  assert.equal(run('2026-11-13T18:05:00Z')[0].body, 'Still time — post today to keep your 3-day streak.');
+  assert.equal(run('2026-11-13T18:05:00Z')[0].body, 'Still time, post today to keep your 3-day streak.');
   const last = run('2026-11-13T21:35:00Z')[0];
   assert.equal(last.kind, 'last_call');
   assert.match(last.body, /Last call/);

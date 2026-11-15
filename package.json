@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Personal accountability PWA for posting on LinkedIn every Friday, Saturday and Sunday.",
+  "description": "Personal accountability PWA for posting on LinkedIn",
   "engines": {
     "node": "26.x"
   },
