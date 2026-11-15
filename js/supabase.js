@@ -47,7 +47,7 @@ export async function onAuthChange(cb) {
 /** Where auth emails and OAuth send people back to. No hash: Supabase appends #access_token=… */
 export const appUrl = () => `${location.origin}/app.html`;
 
-/** Magic link (the email also carries a 6-digit code). New addresses get an account. */
+/** Magic link (the email also carries a one-time code). New addresses get an account. */
 export async function sendMagicLink(email) {
   const sb = await supabase();
   const { error } = await sb.auth.signInWithOtp({

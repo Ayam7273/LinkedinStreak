@@ -6,7 +6,7 @@
    - Push + notificationclick (opens /app.html#/log).
    - Update flow: a new version waits until the page asks for SKIP_WAITING. */
 
-const VERSION = 'v3.0.2';
+const VERSION = 'v3.0.3';
 const SHELL_CACHE = `ls-shell-${VERSION}`;
 const RUNTIME_CACHE = `ls-runtime-${VERSION}`;
 

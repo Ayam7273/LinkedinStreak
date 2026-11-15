@@ -177,6 +177,13 @@
   text-decoration: underline;
 }
 
+.link-btn:disabled {
+  color: var(--text-muted);
+  font-weight: var(--fw-regular);
+  text-decoration: none;
+  cursor: default;
+}
+
 /* ---------------------------------------------------------------- Forms */
 .field {
   display: grid;
@@ -186,6 +193,10 @@
 .field__hint {
   font-size: var(--fs-sm);
   color: var(--text-muted);
+}
+
+.field__hint:empty {
+  display: none;
 }
 
 .field__error {
@@ -1510,6 +1521,49 @@
   width: var(--icon);
   height: var(--icon);
   flex: none;
+}
+
+/* "Can't sign in?" help on the login page */
+.help {
+  border-top: var(--line);
+  padding-top: var(--s-3);
+}
+
+.help summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--tap);
+  color: var(--blue);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  cursor: pointer;
+  list-style: none;
+}
+
+.help summary::-webkit-details-marker {
+  display: none;
+}
+
+.help summary .icon {
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.help[open] summary .icon {
+  transform: rotate(var(--turn-half));
+}
+
+.help__list {
+  display: grid;
+  gap: var(--s-2);
+  padding-left: var(--s-5);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  list-style: disc;
+}
+
+.help__list strong {
+  color: var(--text);
 }
 
 /* ---------------------------------------------------------------- Install guide */
